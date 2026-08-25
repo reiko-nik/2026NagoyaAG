@@ -64,7 +64,7 @@ const EVENTS = [
   { sport:"跆拳道", event:"競技、品勢、虛擬跆拳道", start:"2026-10-01", end:"2026-10-03", venue:"豐橋市綜合體育館", city:"豐橋市", address:"愛知県豊橋市神野新田町メノ割1-3", mapQuery:"豊橋市総合体育館", hkg:true },
   { sport:"網球", event:"網球", start:"2026-09-27", end:"2026-10-03", venue:"名古屋市東山公園網球中心", city:"名古屋市", address:"愛知県名古屋市天白区天白町大字八事裏山60-19", mapQuery:"東山公園テニスセンター", hkg:true },
   { sport:"軟式網球", event:"軟式網球", start:"2026-09-18", end:"2026-09-23", venue:"名古屋市東山公園網球中心", city:"名古屋市", address:"愛知県名古屋市天白区天白町大字八事裏山60-19", mapQuery:"東山公園テニスセンター", hkg:false },
-  { sport:"三項鐵人", event:"三項鐵人", start:"2026-09-20", end:"2026-09-21", venue:"蒲郡市三項鐵人賽場", city:"蒲郡市", address:"愛知県蒲郡市", mapQuery:"蒲郡市 三項鉄人", mapLinkOverride:"https://maps.app.goo.gl/GZxBTVma97PBwJN56", hkg:true },
+  { sport:"三項鐵人", event:"三項鐵人", start:"2026-09-20", end:"2026-09-21", venue:"蒲郡市三項鐵人賽場", city:"蒲郡市", address:"愛知県蒲郡市", mapQuery:"蒲郡市 三項鉄人", mapLinkOverride:"https://maps.app.goo.gl/GZxBTVma97PBwJN56?g_st=ic", hkg:true },
   { sport:"排球", event:"室內排球", start:"2026-09-16", end:"2026-10-03", venue:"岡崎中央綜合公園體育館", city:"岡崎市", address:"愛知県岡崎市高隆寺町字峠1", mapQuery:"岡崎中央総合公園総合体育館", hkg:true },
   { sport:"排球", event:"室內排球", start:"2026-09-16", end:"2026-10-03", venue:"小牧市體育館 (Park Arena Komaki)", city:"小牧市", address:"愛知県小牧市間々原新田737", mapQuery:"パークアリーナ小牧", hkg:true },
   { sport:"排球", event:"沙灘排球", start:"2026-09-20", end:"2026-10-03", venue:"碧南綠地沙灘排球場", city:"碧南市", address:"愛知県碧南市港本町", mapQuery:"碧南緑地ビーチコート", hkg:true },
