@@ -278,6 +278,23 @@ $("#map-hkg-only").addEventListener("change", applyMapFilters);
 // TAB 3 — Sortable table
 // ==================================================================
 let tableSort = { key:"start", dir:1 };
+const openRosterIds = new Set(); // remembers which rows are expanded across re-renders
+
+function renderRosterPanel(roster){
+  const men = roster.athletes.filter(a=>a.g==="M");
+  const women = roster.athletes.filter(a=>a.g==="F");
+  const list = arr => arr.map(a=>`<li><span class="ath-en">${a.en}</span><span class="ath-zh">${a.zh}</span></li>`).join("");
+  const col = (title, arr) => arr.length
+    ? `<div class="roster-col"><h4>${title}（${arr.length}）</h4><ul>${list(arr)}</ul></div>`
+    : "";
+  return `<div class="roster-panel">
+    <div class="roster-title">${roster.label} · 香港代表名單（共 ${roster.athletes.length} 人）</div>
+    <div class="roster-cols">
+      ${col("男子 Men", men)}
+      ${col("女子 Women", women)}
+    </div>
+  </div>`;
+}
 
 function renderTable(){
   let rows = [...EVENTS];
@@ -299,13 +316,20 @@ function renderTable(){
   const tbody = $("#table-body");
   tbody.innerHTML = rows.map(e=>{
     const dateStr = e.start===e.end ? e.start : `${e.start} – ${e.end}`;
-    return `<tr>
+    const roster = e.hkg ? getRoster(e.disciplineKey) : null;
+    const expandable = !!(roster && roster.athletes.length);
+    const isOpen = expandable && openRosterIds.has(e.id);
+    const mainRow = `<tr class="event-row${expandable?' expandable':''}${isOpen?' open':''}" data-id="${e.id}">
       <td class="date-range" data-label="日期">${dateStr}</td>
-      <td data-label="運動項目"><strong>${e.sport}</strong></td>
+      <td data-label="運動項目"><strong>${expandable?'<span class="expand-ind">'+(isOpen?'▾':'▸')+'</span>':''}${e.sport}</strong></td>
       <td data-label="分項">${e.event}</td>
       <td data-label="場館">${e.venue}</td>
       <td data-label="香港代表隊">${e.hkg ? '<span class="badge-hkg">🇭🇰 HKG</span>' : '<span class="badge-none">—</span>'}</td>
     </tr>`;
+    const rosterRow = expandable
+      ? `<tr class="roster-row" data-for="${e.id}"${isOpen?'':' hidden'}><td colspan="5">${renderRosterPanel(roster)}</td></tr>`
+      : "";
+    return mainRow + rosterRow;
   }).join("");
 
   $$("th[data-sort]").forEach(th=>{
@@ -313,9 +337,55 @@ function renderTable(){
     ind.textContent = th.dataset.sort===tableSort.key ? (tableSort.dir===1?"▲":"▼") : "";
   });
 
-  $("#unscheduled-note").textContent = HKG_UNSCHEDULED.length
-    ? `香港代表隊亦已確認參與以下項目，惟賽程表暫未提供場館/日期資料：${HKG_UNSCHEDULED.join("、")}`
-    : "";
+  $$("#table-body tr.expandable").forEach(tr=>{
+    tr.addEventListener("click", ()=>{
+      const id = Number(tr.dataset.id);
+      const rosterRow = $(`#table-body tr.roster-row[data-for="${id}"]`);
+      if(!rosterRow) return;
+      const willOpen = rosterRow.hasAttribute("hidden");
+      if(willOpen){ rosterRow.removeAttribute("hidden"); openRosterIds.add(id); }
+      else { rosterRow.setAttribute("hidden",""); openRosterIds.delete(id); }
+      tr.classList.toggle("open", willOpen);
+      const ind = $(".expand-ind", tr);
+      if(ind) ind.textContent = willOpen ? "▾" : "▸";
+    });
+  });
+
+}
+
+function renderUnscheduled(){
+  const section = $("#unscheduled-section");
+  if(!section) return;
+  if(!HKG_UNSCHEDULED.length){ section.innerHTML = ""; return; }
+
+  section.innerHTML = `
+    <p class="hint">香港代表隊亦已確認參與以下項目，惟賽程表暫未提供場館/日期資料。如有代表名單，可點擊展開：</p>
+    <div class="unscheduled-list">
+      ${HKG_UNSCHEDULED.map(u=>{
+        const roster = u.disciplineKey ? getRoster(u.disciplineKey) : null;
+        const expandable = !!(roster && roster.athletes.length);
+        const key = "u:"+u.sport;
+        const isOpen = expandable && openRosterIds.has(key);
+        return `<div class="unscheduled-item${expandable?' expandable':''}${isOpen?' open':''}" data-key="${key}">
+          <div class="unscheduled-head">${expandable?'<span class="expand-ind">'+(isOpen?'▾':'▸')+'</span>':''}<span class="unscheduled-name">${u.sport}</span></div>
+          ${expandable ? `<div class="unscheduled-roster"${isOpen?'':' hidden'}>${renderRosterPanel(roster)}</div>` : ""}
+        </div>`;
+      }).join("")}
+    </div>`;
+
+  $$(".unscheduled-item.expandable", section).forEach(item=>{
+    item.addEventListener("click", ()=>{
+      const key = item.dataset.key;
+      const panel = $(".unscheduled-roster", item);
+      if(!panel) return;
+      const willOpen = panel.hasAttribute("hidden");
+      if(willOpen){ panel.removeAttribute("hidden"); openRosterIds.add(key); }
+      else { panel.setAttribute("hidden",""); openRosterIds.delete(key); }
+      item.classList.toggle("open", willOpen);
+      const ind = $(".expand-ind", item);
+      if(ind) ind.textContent = willOpen ? "▾" : "▸";
+    });
+  });
 }
 
 $$("th[data-sort]").forEach(th=>{
@@ -334,3 +404,4 @@ renderDayRibbon();
 renderGantt();
 renderVenueList();
 renderTable();
+renderUnscheduled();
