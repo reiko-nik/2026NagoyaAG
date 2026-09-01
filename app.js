@@ -14,30 +14,58 @@ const TOTAL_DAYS = Math.round((GAMES_END-GAMES_START)/86400000)+1;
 const dayIndex = s => Math.round((toDate(s)-GAMES_START)/86400000);
 
 // ---------- tabs ----------
+function switchTab(name){
+  $$(".tab-btn").forEach(b=>b.classList.toggle("active", b.dataset.tab===name));
+  $$(".tab-panel").forEach(p=>p.classList.toggle("active", p.id==="tab-"+name));
+}
 $$(".tab-btn").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    $$(".tab-btn").forEach(b=>b.classList.remove("active"));
-    $$(".tab-panel").forEach(p=>p.classList.remove("active"));
-    btn.classList.add("active");
-    $("#tab-"+btn.dataset.tab).classList.add("active");
-  });
+  btn.addEventListener("click", ()=> switchTab(btn.dataset.tab));
 });
 
 // ---------- modal ----------
 function openModal(e, venues){
   const dateStr = e.start===e.end ? e.start : `${e.start} – ${e.end}`;
+  const roster = e.hkg ? getRoster(e.disciplineKey) : null;
+  const hasRoster = !!(roster && roster.athletes.length);
   $("#modal-body").innerHTML = `
     <h3>${e.event}</h3>
     <div class="m-sub">${e.sport}${e.hkg?' · <span style="color:#ff8fa0">香港代表隊參與</span>':''}</div>
     <div class="m-row"><span>日期</span><span>${dateStr}</span></div>
     <div class="m-row"><span>場館</span><span>${venues ? venues.join('、') : e.venue}</span></div>
     <div class="m-row"><span>地址</span><span>${e.address||''}</span></div>
-    <a class="m-link" href="${mapExternalUrl(e)}" target="_blank" rel="noopener">在 Google 地圖開啟 ↗</a>
+    <div class="m-actions">
+      <a class="m-link" href="${mapExternalUrl(e)}" target="_blank" rel="noopener">在 Google 地圖開啟 ↗</a>
+      ${hasRoster ? `<button type="button" class="m-link m-link-secondary" id="modal-roster-btn">查看香港代表名單 →</button>` : ""}
+    </div>
   `;
   $("#modal-backdrop").classList.add("open");
+  if(hasRoster){
+    $("#modal-roster-btn").addEventListener("click", ()=>{
+      $("#modal-backdrop").classList.remove("open");
+      jumpToRoster(e.sport, e.event);
+    });
+  }
 }
 $("#modal-close").addEventListener("click", ()=> $("#modal-backdrop").classList.remove("open"));
 $("#modal-backdrop").addEventListener("click", ev=>{ if(ev.target.id==="modal-backdrop") $("#modal-backdrop").classList.remove("open"); });
+
+// jump from Tab 1/2's modal to the matching HKG roster row in Tab 3
+function jumpToRoster(sport, event){
+  const match = EVENTS.find(e => e.sport===sport && e.event===event && e.hkg && getRoster(e.disciplineKey));
+  if(!match) return;
+
+  switchTab("table");
+  openRosterIds.add(match.id);
+  renderTable();
+
+  requestAnimationFrame(()=>{
+    const row = document.querySelector(`#table-body tr.event-row[data-id="${match.id}"]`);
+    if(!row) return;
+    row.scrollIntoView({ behavior:"smooth", block:"center" });
+    row.classList.add("flash");
+    setTimeout(()=> row.classList.remove("flash"), 1500);
+  });
+}
 
 // ==================================================================
 // TAB 1 — Day ribbon + Gantt timeline + Daily view
@@ -104,7 +132,7 @@ function groupForGantt(){
     const g = bySport[e.sport];
     if(e.hkg) g.hkg = true;
     const key = e.event+"|"+e.start+"|"+e.end;
-    if(!g.bars[key]) g.bars[key] = { event:e.event, start:e.start, end:e.end, hkg:e.hkg, venues:[], sport:e.sport, address:e.address, mapQuery:e.mapQuery, mapLinkOverride:e.mapLinkOverride };
+    if(!g.bars[key]) g.bars[key] = { event:e.event, start:e.start, end:e.end, hkg:e.hkg, venues:[], sport:e.sport, address:e.address, mapQuery:e.mapQuery, mapLinkOverride:e.mapLinkOverride, disciplineKey:e.disciplineKey };
     g.bars[key].venues.push(e.venue);
   });
   return { bySport, order };
@@ -140,7 +168,7 @@ function renderGantt(){
       el.style.width = width+"%";
       el.textContent = bar.event + (bar.venues.length>1?` ×${bar.venues.length}`:"");
       el.title = `${bar.event} · ${bar.venues.join('、')} · ${bar.start}–${bar.end}`;
-      el.addEventListener("click", ()=> openModal({sport, event:bar.event, start:bar.start, end:bar.end, hkg:bar.hkg, venue:bar.venues[0], address:bar.address, mapQuery:bar.mapQuery, mapLinkOverride:bar.mapLinkOverride}, bar.venues));
+      el.addEventListener("click", ()=> openModal({sport, event:bar.event, start:bar.start, end:bar.end, hkg:bar.hkg, venue:bar.venues[0], address:bar.address, mapQuery:bar.mapQuery, mapLinkOverride:bar.mapLinkOverride, disciplineKey:bar.disciplineKey}, bar.venues));
       track.appendChild(el);
     });
 

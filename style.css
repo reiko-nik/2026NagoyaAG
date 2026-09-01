@@ -231,6 +231,11 @@ tbody tr:last-child td{ border-bottom:none; }
 tbody tr.event-row.expandable{ cursor:pointer; }
 tbody tr.event-row.expandable:hover{ background:rgba(208,24,47,.07); }
 tbody tr.event-row.open{ background:rgba(208,24,47,.05); }
+tbody tr.event-row.flash{ animation: rosterFlash 1.4s ease; }
+@keyframes rosterFlash{
+  0%{ background:rgba(208,24,47,.4); }
+  100%{ background:transparent; }
+}
 .expand-ind{
   display:inline-block; width:1em; margin-right:.3em; color:var(--hkg-red);
   font-size:11px;
@@ -288,11 +293,17 @@ tbody tr.roster-row td{ padding:0; background:rgba(255,255,255,.015); }
 #modal-body .m-sub{ color:var(--text-dim); font-size:13px; margin-bottom:14px; }
 #modal-body .m-row{ display:flex; justify-content:space-between; padding:8px 0; border-top:1px solid var(--border); font-size:13.5px; }
 #modal-body .m-row span:first-child{ color:var(--text-dim); }
-#modal-body a.m-link{
-  display:block; text-align:center; margin-top:16px; background:var(--flame); color:#fff;
+#modal-body .m-actions{ display:flex; flex-direction:column; gap:10px; margin-top:16px; }
+#modal-body a.m-link, #modal-body button.m-link{
+  display:block; width:100%; text-align:center; background:var(--flame); color:#fff;
   padding:11px; border-radius:8px; text-decoration:none; font-weight:500; font-size:14px;
+  border:none; cursor:pointer; font-family:inherit;
 }
-#modal-body a.m-link:hover{ filter:brightness(1.1); }
+#modal-body a.m-link:hover, #modal-body button.m-link:hover{ filter:brightness(1.1); }
+#modal-body .m-link.m-link-secondary{
+  background:transparent; border:1px solid var(--hkg-red); color:#ff8fa0;
+}
+#modal-body .m-link.m-link-secondary:hover{ background:rgba(208,24,47,.12); filter:none; }
 
 /* ---------- Mobile ---------- */
 @media (max-width:640px){
