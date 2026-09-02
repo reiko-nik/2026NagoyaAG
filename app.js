@@ -19,6 +19,19 @@ const dayIndex = s => Math.round((toDate(s)-GAMES_START)/86400000);
 function inAnyRange(dateStr, ranges){
   return !!(ranges && ranges.length) && ranges.some(r=> dateStr>=r.start && dateStr<=r.end);
 }
+// some disciplines (handball, baseball, softball, cricket, water polo) list the FULL international
+// schedule with an explicit opponent ("opp") only on HKG's own matches; other sessions under that
+// same row are other countries playing each other. hasOppTracking / sessionIsHkgRelevant let the UI
+// tell those apart instead of badging every session of an hkg:true row as a Hong Kong match.
+function hasOppTracking(e){
+  return !!(e.sessions && e.sessions.some(s=>s.opp));
+}
+function sessionIsHkgRelevant(e, s){
+  if(!e.hkg) return false;
+  if(!s) return true; // rows with no session data (e.g. ceremonies) — fall back to row-level flag
+  if(hasOppTracking(e)) return !!s.opp;
+  return true;
+}
 
 // ---------- tabs ----------
 function switchTab(name){
@@ -105,13 +118,25 @@ $$(".view-btn").forEach(btn=>{
   });
 });
 
+function dayHasHkgAction(dateStr){
+  return EVENTS.some(e=>{
+    if(!e.hkg) return false;
+    if(e.sessions && e.sessions.length){
+      return hasOppTracking(e)
+        ? e.sessions.some(s=> s.date===dateStr && s.opp)
+        : e.sessions.some(s=> s.date===dateStr);
+    }
+    return inAnyRange(dateStr, e.dateRanges);
+  });
+}
+
 function renderDayRibbon(){
   const ribbon = $("#day-ribbon");
   ribbon.innerHTML = "";
   for(let i=0;i<TOTAL_DAYS;i++){
     const d = new Date(GAMES_START.getTime()+i*86400000);
     const dateStr = ymd(d);
-    const hasHkg = EVENTS.some(e=> e.hkg && inAnyRange(dateStr, e.dateRanges));
+    const hasHkg = dayHasHkgAction(dateStr);
     const chip = document.createElement("div");
     chip.className = "day-chip" + (hasHkg?" has-hkg":"");
     chip.dataset.idx = i;
@@ -221,49 +246,49 @@ function renderDailyView(){
   const q = $("#cal-search").value.trim().toLowerCase();
   const hkgOnly = $("#cal-hkg-only").checked;
 
-  // one card per actual session on this date; rows with no session data (e.g. ceremonies)
-  // fall back to a single all-day card when the date falls within their range.
   let cards = [];
   EVENTS.forEach(e=>{
     if(hkgOnly && !e.hkg) return;
     if(e.sessions && e.sessions.length){
       e.sessions.filter(s=>s.date===dateStr).forEach(s=>{
+        const relevant = sessionIsHkgRelevant(e, s);
+        if(hkgOnly && hasOppTracking(e) && !relevant) return; // skip other countries' matches when filtering to HKG-only
         if(q){
           const hay = (e.sport+e.event+e.venue+s.name+(s.venue||"")).toLowerCase();
           if(!hay.includes(q)) return;
         }
-        cards.push({ e, s, hkgMatch: !!s.opp });
+        cards.push({ e, s, hkgMatch: !!s.opp, relevant });
       });
     } else if(inAnyRange(dateStr, e.dateRanges)){
       if(q){
         const hay = (e.sport+e.event+e.venue).toLowerCase();
         if(!hay.includes(q)) return;
       }
-      cards.push({ e, s:null, hkgMatch:false });
+      cards.push({ e, s:null, hkgMatch:false, relevant: e.hkg });
     }
   });
-  cards.sort((a,b)=> (Number(b.e.hkg)-Number(a.e.hkg)) || ((a.s&&a.s.start)||"").localeCompare((b.s&&b.s.start)||"") || a.e.sport.localeCompare(b.e.sport,'zh-Hant'));
+  cards.sort((a,b)=> (Number(b.relevant)-Number(a.relevant)) || ((a.s&&a.s.start)||"").localeCompare((b.s&&b.s.start)||"") || a.e.sport.localeCompare(b.e.sport,'zh-Hant'));
 
   const list = $("#daily-list");
   if(!cards.length){
     list.innerHTML = `<div class="daily-empty">此日沒有符合篩選條件的賽事</div>`;
     return;
   }
-  list.innerHTML = cards.map(({e, s, hkgMatch})=>{
+  list.innerHTML = cards.map(({e, s, hkgMatch, relevant})=>{
     const sidx = s ? e.sessions.indexOf(s) : -1;
     const timeStr = s ? (s.start||"") + (s.end?`–${s.end}`:"") : "全日";
     const nameStr = s ? s.name : e.event;
     const venueStr = s ? (s.venue||e.venue) : e.venue;
     const phaseBadge = s ? `<span class="badge-phase phase-${s.phase}">${PHASE_LABELS[s.phase]||s.phase}</span>` : "";
     const oppBadge = s && s.opp ? `<span class="badge-opp">vs ${s.opp}</span>` : "";
-    return `<div class="daily-card${e.hkg?' hkg':''}${hkgMatch?' hkg-match':''}" data-id="${e.id}" data-sidx="${sidx}">
+    return `<div class="daily-card${relevant?' hkg':''}${hkgMatch?' hkg-match':''}" data-id="${e.id}" data-sidx="${sidx}">
       <div class="dc-main">
         <div class="dc-time">${timeStr}</div>
         <div class="dc-sport">${e.sport}</div>
         <div class="dc-event">${nameStr}</div>
         <div class="dc-venue">📍 ${venueStr}</div>
       </div>
-      <div class="dc-badge">${phaseBadge}${oppBadge}${e.hkg ? '<span class="badge-hkg">🇭🇰 HKG</span>' : ''}</div>
+      <div class="dc-badge">${phaseBadge}${oppBadge}${relevant ? '<span class="badge-hkg">🇭🇰 HKG</span>' : ''}</div>
     </div>`;
   }).join("");
 
@@ -274,7 +299,7 @@ function renderDailyView(){
       const sidx = Number(card.dataset.sidx);
       const s = sidx>=0 ? e.sessions[sidx] : null;
       if(s){
-        openModal({ sport:e.sport, event:e.event, title:s.name, start:s.date, end:s.date, hkg:e.hkg, venue:s.venue||e.venue,
+        openModal({ sport:e.sport, event:e.event, title:s.name, start:s.date, end:s.date, hkg:sessionIsHkgRelevant(e,s), venue:s.venue||e.venue,
                     address:e.address, mapQuery:e.mapQuery, mapLinkOverride:e.mapLinkOverride, disciplineKey:e.disciplineKey,
                     sessionTime:(s.start||"")+(s.end?`–${s.end}`:""), phase:s.phase, opp:s.opp });
       } else {
@@ -359,7 +384,7 @@ const subTabState = new Map();   // event id -> "schedule" | "roster" (which sub
 function renderRosterPanel(roster){
   const men = roster.athletes.filter(a=>a.g==="M");
   const women = roster.athletes.filter(a=>a.g==="F");
-  const list = arr => arr.map(a=>`<li><span class="ath-en">${a.en}</span><span class="ath-zh">${a.zh}${a.event?` <span class="ath-event">${a.event}</span>`:''}</span></li>`).join("");
+  const list = arr => arr.map(a=>`<li><span class="ath-en">${a.en}</span><span class="ath-zh">${a.zh}</span></li>`).join("");
   const col = (title, arr) => arr.length
     ? `<div class="roster-col"><h4>${title}（${arr.length}）</h4><ul>${list(arr)}</ul></div>`
     : "";
