@@ -4,6 +4,9 @@ const $$ = (sel, el=document) => [...el.querySelectorAll(sel)];
 const toDate = s => new Date(s + "T00:00:00");
 const fmtShort = d => `${d.getMonth()+1}/${d.getDate()}`;
 const WEEKDAY = ["日","一","二","三","四","五","六"];
+// local-calendar-date formatter — NOT toISOString(), which converts to UTC and would
+// shift the date by a day in timezones ahead of UTC (e.g. Hong Kong, Japan).
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 
 function mapEmbedUrl(query){ return `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`; }
 function mapExternalUrl(e){ return e.mapLinkOverride || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.mapQuery)}`; }
@@ -89,7 +92,7 @@ function clampTodayIdx(){
   const idx = Math.round((today-GAMES_START)/86400000);
   return Math.min(Math.max(idx,0), TOTAL_DAYS-1);
 }
-function dateStrForIdx(i){ return new Date(GAMES_START.getTime()+i*86400000).toISOString().slice(0,10); }
+function dateStrForIdx(i){ return ymd(new Date(GAMES_START.getTime()+i*86400000)); }
 
 $$(".view-btn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
@@ -107,7 +110,7 @@ function renderDayRibbon(){
   ribbon.innerHTML = "";
   for(let i=0;i<TOTAL_DAYS;i++){
     const d = new Date(GAMES_START.getTime()+i*86400000);
-    const dateStr = d.toISOString().slice(0,10);
+    const dateStr = ymd(d);
     const hasHkg = EVENTS.some(e=> e.hkg && inAnyRange(dateStr, e.dateRanges));
     const chip = document.createElement("div");
     chip.className = "day-chip" + (hasHkg?" has-hkg":"");
