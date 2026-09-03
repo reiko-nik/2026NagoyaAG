@@ -164,11 +164,12 @@ function scrollGanttToDay(i){
 }
 
 function groupForGantt(){
-  const bySport = {};
+  const byKey = {};
   const order = [];
   EVENTS.forEach(e=>{
-    if(!bySport[e.sport]){ bySport[e.sport] = { hkg:false, bars:[] }; order.push(e.sport); }
-    const g = bySport[e.sport];
+    const key = e.sport + "|" + e.event;
+    if(!byKey[key]){ byKey[key] = { sport:e.sport, event:e.event, hkg:false, bars:[] }; order.push(key); }
+    const g = byKey[key];
     if(e.hkg) g.hkg = true;
     const ranges = (e.dateRanges && e.dateRanges.length) ? e.dateRanges : [{start:e.start, end:e.end}];
     ranges.forEach(rg=>{
@@ -176,23 +177,46 @@ function groupForGantt(){
                     address:e.address, mapQuery:e.mapQuery, mapLinkOverride:e.mapLinkOverride, disciplineKey:e.disciplineKey });
     });
   });
-  return { bySport, order };
+  return { byKey, order };
+}
+
+function renderGanttAxis(){
+  const row = document.createElement("div");
+  row.className = "gantt-row gantt-axis";
+  const label = document.createElement("div");
+  label.className = "gantt-label gantt-axis-label";
+  row.appendChild(label);
+  const track = document.createElement("div");
+  track.className = "gantt-track gantt-axis-track";
+  const todayStr = dateStrForIdx(clampTodayIdx());
+  for(let i=0;i<TOTAL_DAYS;i++){
+    const d = new Date(GAMES_START.getTime()+i*86400000);
+    const ds = dateStrForIdx(i);
+    const cell = document.createElement("div");
+    cell.className = "gantt-axis-cell" + (ds===todayStr?" today":"");
+    cell.innerHTML = `<span class="gac-num">${d.getDate()}</span><span class="gac-wd">${WEEKDAY[d.getDay()]}</span>`;
+    track.appendChild(cell);
+  }
+  row.appendChild(track);
+  return row;
 }
 
 function renderGantt(){
-  const { bySport, order } = groupForGantt();
+  const { byKey, order } = groupForGantt();
   const gantt = $("#gantt");
   gantt.innerHTML = "";
-  order.forEach(sport=>{
-    const g = bySport[sport];
+  gantt.appendChild(renderGanttAxis());
+  order.forEach(key=>{
+    const g = byKey[key];
     const row = document.createElement("div");
     row.className = "gantt-row";
-    row.dataset.sport = sport;
+    row.dataset.sport = g.sport;
+    row.dataset.event = g.event;
     row.dataset.hkg = g.hkg;
 
     const label = document.createElement("div");
     label.className = "gantt-label";
-    label.textContent = sport;
+    label.innerHTML = `<span class="gl-sport">${g.sport}</span><span class="gl-event">${g.event}</span>`;
     row.appendChild(label);
 
     const track = document.createElement("div");
@@ -208,8 +232,8 @@ function renderGantt(){
       el.style.left = left+"%";
       el.style.width = width+"%";
       el.textContent = bar.event;
-      el.title = `${bar.event} · ${bar.venue} · ${bar.start}–${bar.end}`;
-      el.addEventListener("click", ()=> openModal({sport, event:bar.event, start:bar.start, end:bar.end, hkg:bar.hkg, venue:bar.venue, address:bar.address, mapQuery:bar.mapQuery, mapLinkOverride:bar.mapLinkOverride, disciplineKey:bar.disciplineKey}));
+      el.title = `${bar.sport} · ${bar.event} · ${bar.venue} · ${bar.start}–${bar.end}`;
+      el.addEventListener("click", ()=> openModal({sport:bar.sport, event:bar.event, start:bar.start, end:bar.end, hkg:bar.hkg, venue:bar.venue, address:bar.address, mapQuery:bar.mapQuery, mapLinkOverride:bar.mapLinkOverride, disciplineKey:bar.disciplineKey}));
       track.appendChild(el);
     });
 
@@ -222,8 +246,8 @@ function renderGantt(){
 function applyGanttFilters(){
   const q = $("#cal-search").value.trim().toLowerCase();
   const hkgOnly = $("#cal-hkg-only").checked;
-  $$(".gantt-row").forEach(row=>{
-    const matchesQ = !q || row.dataset.sport.toLowerCase().includes(q) || $$(".gantt-bar", row).some(b=>b.textContent.toLowerCase().includes(q));
+  $$(".gantt-row:not(.gantt-axis)").forEach(row=>{
+    const matchesQ = !q || row.dataset.sport.toLowerCase().includes(q) || row.dataset.event.toLowerCase().includes(q) || $$(".gantt-bar", row).some(b=>b.textContent.toLowerCase().includes(q));
     const matchesHkg = !hkgOnly || row.dataset.hkg==="true";
     row.classList.toggle("dim", !(matchesQ && matchesHkg));
   });
@@ -397,7 +421,107 @@ function renderRosterPanel(roster){
   </div>`;
 }
 
-function renderSchedulePanel(sessions){
+// ---- match a session to the specific HKG athlete(s) competing in it -----------------------
+// Team sports (handball/baseball/softball/cricket/water polo) already flag their own HKG matches
+// via `s.opp`; for those we show the roster split by the gender implied in the session name.
+// Individual sports use each athlete's confirmed `event` tag (Chinese) matched against the
+// session's English name via discipline-specific keyword rules below.
+function matchSessionAthletes(e, s){
+  const roster = getRoster(e.disciplineKey);
+  if(!roster) return [];
+  const name = s.name, n = name.toLowerCase();
+  const isWomenName = /\bwomen|\bgirl/i.test(name);
+  const isMenName = /\bmen\b|\bboy/i.test(name) && !isWomenName;
+  // word-boundary aware gender test — plain .includes('men') would wrongly match inside "women"
+  const hasGender = (str, isF) => new RegExp(`\\b${isF?'women':'men'}\\b`, 'i').test(str);
+
+  if(s.opp){ // team match — whole roster of the implied gender
+    return roster.athletes.filter(a => isWomenName ? a.g==='F' : isMenName ? a.g==='M' : true);
+  }
+
+  const tagged = roster.athletes.filter(a=>a.event);
+  if(!tagged.length) return [];
+
+  return tagged.filter(a=>{
+    const ev = a.event, isF = a.g==='F';
+    switch(e.disciplineKey){
+      case 'fencing': {
+        const wm = {'花劍':'foil','重劍':'épée','佩劍':'sabre'};
+        const weapon = Object.keys(wm).find(zh=>ev.includes(zh));
+        if(!weapon || !n.includes(wm[weapon]) || !hasGender(name, isF)) return false;
+        if(ev.includes('團體賽') && !ev.includes('個人') && !/\bteam\b/i.test(name)) return false;
+        return true;
+      }
+      case 'archery': {
+        const bow = ev.includes('反曲弓') ? 'R' : ev.includes('複合弓') ? 'C' : null;
+        if(!bow) return false;
+        const code = bow + (isF ? 'W' : 'M');
+        const spelled = (bow==='R'?'Recurve':'Compound') + ' ' + (isF?'Women':'Men');
+        return new RegExp(`\\b${code}\\b`).test(name) || name.includes(spelled);
+      }
+      case 'judo': case 'taekwondo': {
+        const m = ev.match(/(\d+)公斤級/);
+        return !!m && n.includes(`-${m[1]}kg`) && hasGender(name, isF);
+      }
+      case 'shooting': {
+        if(ev.includes('手槍速射') && !/rapid fire pistol/i.test(name)) return false;
+        if(ev.includes('氣手槍') && !/air pistol/i.test(name)) return false;
+        if(!ev.includes('手槍速射') && !ev.includes('氣手槍')) return false;
+        return hasGender(name, isF);
+      }
+      case 'sailing': {
+        if(ev.includes('49人級') && !/skiff/i.test(name)) return false;
+        if(ev.includes('愛爾卡') && !/dinghy/i.test(name)) return false;
+        if(!ev.includes('49人級') && !ev.includes('愛爾卡')) return false;
+        return hasGender(name, isF);
+      }
+      case 'sailing_windsurfing':
+        return /windsurfing/i.test(name) && hasGender(name, isF);
+      case 'tennis': {
+        if(ev.includes('單打') && !/singles/i.test(name)) return false;
+        if(ev.includes('雙打') && !/doubles/i.test(name)) return false;
+        if(ev.includes('團體') && !/\bteam\b/i.test(name)) return false;
+        if(!/mixed/i.test(name) && !hasGender(name, isF)) return false;
+        return true;
+      }
+      case 'triathlon': {
+        if(ev.includes('混合接力') && /relay/i.test(name)) return true;
+        if(ev.includes('個人賽') && /individual/i.test(name) && hasGender(name, isF)) return true;
+        return false;
+      }
+      case 'cycling_track_road': {
+        if(ev.includes('公路賽') && /road/i.test(name) && hasGender(name, isF)) return true;
+        if(ev.includes('全能賽') && /omnium/i.test(name) && hasGender(name, isF)) return true;
+        if(ev.includes('麥迪遜') && /madison/i.test(name) && hasGender(name, isF)) return true;
+        return false;
+      }
+      case 'aquatics_swimming': {
+        const sm = {'自由泳':'freestyle','蛙泳':'breaststroke','背泳':'backstroke','蝶泳':'butterfly','混合泳':'medley'};
+        const stroke = Object.keys(sm).find(zh=> ev.includes(zh) && n.includes(sm[zh]));
+        if(!stroke || !hasGender(name, isF)) return false;
+        const distances = [...ev.matchAll(/(\d+)米/g)].map(m=>m[1]);
+        if(!distances.length) return true;
+        return distances.some(d => new RegExp(`\\b${d}m\\b`).test(n));
+      }
+      case 'badminton':
+        return ev.includes('混合雙打') && /mixed doubles/i.test(name);
+      case 'volleyball_beach':
+        return hasGender(name, isF);
+      case 'esports': {
+        const gm = {
+          '寶可夢大集結':'pokemon unite', '王者榮耀':'honor', '英雄聯盟':'league of legends',
+          '無盡對決':'naraka', '跑車浪漫旅7':'gran turismo', '競技武術團體賽':'fighting games',
+        };
+        const key = Object.keys(gm).find(zh=>ev.includes(zh));
+        return !!key && n.includes(gm[key]);
+      }
+      default: return false;
+    }
+  });
+}
+
+function renderSchedulePanel(e){
+  const sessions = e.sessions;
   const byDate = {};
   const order = [];
   sessions.forEach(s=>{
@@ -410,13 +534,20 @@ function renderSchedulePanel(sessions){
       <div class="sched-day">
         <div class="sched-day-label">${fmtDate(ds)}</div>
         <div class="sched-day-items">
-          ${byDate[ds].map(s=>`
-            <div class="sched-item${s.opp?' hkg-match':''}">
+          ${byDate[ds].map(s=>{
+            const athletes = e.hkg ? matchSessionAthletes(e, s) : [];
+            const isHkg = !!s.opp || athletes.length>0;
+            const athleteLine = athletes.length
+              ? `<div class="sched-athletes">🇭🇰 ${athletes.map(a=>`${a.zh} (${a.en})`).join('、')}</div>`
+              : '';
+            return `
+            <div class="sched-item${isHkg?' hkg-match':''}">
               <span class="sched-time">${s.start||''}${s.end?'–'+s.end:''}</span>
               <span class="sched-name">${s.name}${s.opp?` <span class="sched-opp">vs ${s.opp}</span>`:''}</span>
               <span class="sched-phase phase-${s.phase}">${PHASE_LABELS[s.phase]||s.phase}</span>
               ${s.venue?`<span class="sched-venue">📍 ${s.venue}</span>`:''}
-            </div>`).join('')}
+              ${athleteLine}
+            </div>`;}).join('')}
         </div>
       </div>`).join('')}
   </div>`;
@@ -429,9 +560,9 @@ function renderExpandContent(e, roster, hasRoster, hasSchedule){
         <button type="button" class="expand-tab-btn${active==='schedule'?' active':''}" data-subtab="schedule">賽程</button>
         <button type="button" class="expand-tab-btn${active==='roster'?' active':''}" data-subtab="roster">代表名單</button>
       </div>
-      <div class="expand-tab-content">${active==='schedule' ? renderSchedulePanel(e.sessions) : renderRosterPanel(roster)}</div>`;
+      <div class="expand-tab-content">${active==='schedule' ? renderSchedulePanel(e) : renderRosterPanel(roster)}</div>`;
   }
-  if(hasSchedule) return renderSchedulePanel(e.sessions);
+  if(hasSchedule) return renderSchedulePanel(e);
   if(hasRoster) return renderRosterPanel(roster);
   return "";
 }
@@ -575,9 +706,19 @@ $$("th[data-sort]").forEach(th=>{
 $("#table-search").addEventListener("input", renderTable);
 $("#table-hkg-only").addEventListener("change", renderTable);
 
+// ---------- sticky offset (topbar height varies by breakpoint, so measure it instead of
+// hardcoding — used by .daily-header to pin itself just below the topbar) ----------
+function updateStickyOffsets(){
+  const topbar = $(".topbar");
+  const topbarH = topbar ? topbar.getBoundingClientRect().height : 0;
+  document.documentElement.style.setProperty("--topbar-h", topbarH + "px");
+}
+window.addEventListener("resize", updateStickyOffsets);
+
 // ---------- init ----------
 renderDayRibbon();
 renderGantt();
 renderVenueList();
 renderTable();
 renderUnscheduled();
+updateStickyOffsets();

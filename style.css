@@ -153,6 +153,13 @@ main{ padding:20px 24px 60px; max-width:1280px; margin:0 auto; }
 .daily-card .dc-badge{ flex:0 0 auto; display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
 .daily-empty{ color:var(--text-dim); text-align:center; padding:50px 0; font-size:14px; }
 
+/* ---------- Sticky daily-header (Tab 1 Daily view): keeps the current date + prev/next nav
+   visible while the list of match cards below scrolls, without eating the whole viewport. ---------- */
+.daily-header{
+  position: sticky; top: var(--topbar-h, 0px); z-index: 14;
+  background: var(--bg); padding: 8px 0; margin-top: -8px;
+}
+
 /* ---------- Gantt timeline ---------- */
 .gantt-wrap{ overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-elevated); }
 .gantt{ min-width:1100px; padding:10px 0; }
@@ -162,9 +169,11 @@ main{ padding:20px 24px 60px; max-width:1280px; margin:0 auto; }
 .gantt-row:last-child{ border-bottom:none; }
 .gantt-label{
   flex:0 0 140px; padding:6px 12px; font-size:12.5px; color:var(--text);
-  display:flex; align-items:center; border-right:1px solid var(--border);
+  display:flex; flex-direction:column; justify-content:center; gap:1px; border-right:1px solid var(--border);
   position:sticky; left:0; background:var(--bg-elevated); z-index:2;
 }
+.gantt-label .gl-sport{ font-size:10px; color:var(--text-dim); letter-spacing:.02em; }
+.gantt-label .gl-event{ font-weight:500; line-height:1.2; }
 .gantt-track{ flex:1; position:relative; display:flex; }
 .gantt-track .gridcol{ flex:1; border-right:1px solid rgba(255,255,255,.03); }
 .gantt-bar{
@@ -178,6 +187,23 @@ main{ padding:20px 24px 60px; max-width:1280px; margin:0 auto; }
 .gantt-bar.hkg{ background:rgba(208,24,47,.35); border-color:var(--hkg-red); }
 .gantt-row.dim .gantt-bar{ opacity:.15; pointer-events:none; }
 .gantt-row.dim .gantt-label{ opacity:.3; }
+
+/* date axis — lives INSIDE the same horizontally-scrolling container as the bars, so it is always
+   pixel-aligned with them (fixes the misalignment between the outer day-ribbon and the gantt on
+   narrow/mobile screens, where the two used to scroll independently). */
+.gantt-row.gantt-axis{
+  position:sticky; top:0; z-index:5; background:var(--bg-elevated);
+  border-bottom:1px solid var(--border); min-height:30px;
+}
+.gantt-axis-label{ position:sticky; left:0; z-index:6; background:var(--bg-elevated); }
+.gantt-axis-track{ flex:1; display:flex; }
+.gantt-axis-cell{
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  border-right:1px solid rgba(255,255,255,.03); padding:3px 0;
+}
+.gantt-axis-cell .gac-num{ font-family:"Oswald",sans-serif; font-size:12px; font-weight:600; color:var(--text); }
+.gantt-axis-cell .gac-wd{ font-size:8.5px; color:var(--text-dim); text-transform:uppercase; }
+.gantt-axis-cell.today .gac-num{ color:var(--gold); }
 
 /* ---------- Tab 2: List + Map ---------- */
 .map-layout{ display:grid; grid-template-columns:380px 1fr; gap:16px; align-items:start; }
@@ -257,6 +283,7 @@ tbody tr:last-child td{ border-bottom:none; }
 .sched-name{ flex:1 1 160px; }
 .sched-opp{ color:#ff8fa0; font-weight:600; }
 .sched-venue{ color:var(--text-dim); font-size:11.5px; flex:0 0 auto; }
+.sched-athletes{ flex:1 0 100%; font-size:11.5px; color:#ff8fa0; margin-top:2px; }
 .sched-phase{
   flex:0 0 auto; font-size:10px; font-weight:600; padding:2px 8px; border-radius:10px;
   background:var(--lane); color:var(--text-dim); text-transform:uppercase; letter-spacing:.03em;
@@ -376,8 +403,11 @@ tbody tr.roster-row td{ padding:0; background:rgba(255,255,255,.015); }
   .daily-card{ padding:12px; flex-direction:column; gap:8px; }
   .daily-card .dc-badge{ align-self:flex-start; }
 
-  .gantt-label{ flex-basis:96px; font-size:11px; padding:6px 8px; }
+  .gantt-label{ flex-basis:82px; font-size:10px; padding:6px 6px; }
+  .gantt-label .gl-sport{ font-size:8.5px; }
   .gantt-bar{ font-size:9.5px; }
+  .gantt-axis-cell .gac-num{ font-size:10.5px; }
+  .gantt-axis-cell .gac-wd{ font-size:7.5px; }
 
   .map-panel{ position:static; }
   .map-panel iframe{ height:280px; }
