@@ -192,6 +192,16 @@ main{ padding:20px 24px 60px; max-width:1280px; margin:0 auto; }
 .gantt-row.dim .gantt-bar{ opacity:.15; pointer-events:none; }
 .gantt-row.dim .gantt-label{ opacity:.3; }
 
+.gb-date {
+  opacity: 0.85;
+  font-size: 9px;
+  margin-left: 5px;
+  font-variant-numeric: tabular-nums;
+  background: rgba(0,0,0,0.15);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
 .gantt-row.gantt-axis{
   border-bottom:1px solid var(--border); min-height:30px; background:var(--bg-elevated);
 }
