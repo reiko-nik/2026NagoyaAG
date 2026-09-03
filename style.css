@@ -97,20 +97,20 @@ main{ padding:20px 24px 60px; max-width:1280px; margin:0 auto; }
 .hint{ color:var(--text-dim); font-size:12.5px; margin-top:14px; line-height:1.6; }
 
 /* ---------- Day ribbon (signature element) ---------- */
-/* Sticky in Daily view: keeps the full row of dates reachable while scrolling the daily-card
-   list, so any date can be jumped to directly rather than only stepping prev/next. Hidden in
-   Timeline view, where the gantt's own in-track date axis takes over that role instead. */
 .day-ribbon{
   display:flex; gap:5px; overflow-x:auto; padding:8px 0 10px; margin-bottom:14px;
   position: sticky; top: var(--topbar-h, 0px); z-index: 14;
   background: var(--bg);
   -webkit-overflow-scrolling:touch;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 16px;
 }
 .day-ribbon.is-hidden{ display:none; }
 .day-chip{
   flex:0 0 auto; min-width:52px; text-align:center; padding:8px 6px;
   background:var(--bg-card); border:1px solid var(--border); border-radius:8px;
   cursor:pointer;
+  scroll-snap-align: center;
 }
 .day-chip .dnum{ font-family:"Oswald",sans-serif; font-size:16px; font-weight:600; }
 .day-chip .dlabel{ font-size:9px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.05em; }
@@ -163,10 +163,8 @@ main{ padding:20px 24px 60px; max-width:1280px; margin:0 auto; }
 /* ---------- Gantt timeline ---------- */
 .gantt-wrap{
   overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-elevated);
-  -webkit-overflow-scrolling:touch; /* smooth momentum scrolling on iOS */
-  touch-action:pan-x pan-y; /* let the browser commit to a scroll axis immediately instead of
-    deciding ambiguously, which is what made the first horizontal swipe after a vertical scroll
-    feel inconsistent on touch devices */
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-x pan-y;
 }
 .gantt{ min-width:1100px; padding:10px 0; }
 .gantt-row{
@@ -194,24 +192,12 @@ main{ padding:20px 24px 60px; max-width:1280px; margin:0 auto; }
 .gantt-row.dim .gantt-bar{ opacity:.15; pointer-events:none; }
 .gantt-row.dim .gantt-label{ opacity:.3; }
 
-/* date axis — lives INSIDE the same horizontally-scrolling container as the bars, so it is always
-   pixel-aligned with them (fixes the misalignment between the outer day-ribbon and the gantt on
-   narrow/mobile screens, where the two used to scroll independently). */
 .gantt-row.gantt-axis{
   border-bottom:1px solid var(--border); min-height:30px; background:var(--bg-elevated);
 }
-/* Vertical stickiness for the axis is handled in JS (see setupGanttAxisPin in app.js) via a
-   fixed-position clone, not pure CSS position:sticky — overflow-x:auto on .gantt-wrap forces
-   overflow-y to also become a scroll container, which breaks page-level sticky behavior for
-   descendants placed inside it. The clone's left/width/top are computed from .gantt-wrap's own
-   rect, and its date cells are translated in sync with .gantt-wrap's scrollLeft so it stays
-   pixel-aligned with the bars underneath even while "floating" above them. */
 .gantt-row.gantt-axis.pinned{
   position:fixed; z-index:8; margin:0; overflow:hidden;
-  pointer-events:none; /* let touches/swipes pass straight through to the real scrollable
-    .gantt-wrap underneath — without this, a horizontal swipe starting in this overlay strip
-    gets captured by the (non-scrollable) fixed clone instead of the content below it, which is
-    exactly what made scrolling feel unstable after a vertical scroll had triggered the pin. */
+  pointer-events:none;
 }
 .gantt-axis-label{ position:sticky; left:0; z-index:6; background:var(--bg-elevated); }
 .gantt-axis-track{ flex:1; display:flex; will-change:transform; }
@@ -250,6 +236,8 @@ main{ padding:20px 24px 60px; max-width:1280px; margin:0 auto; }
 @media (max-width:860px){
   .map-layout{ grid-template-columns:1fr; }
   .map-panel{ position:static; }
+  .map-panel iframe { pointer-events: none; }
+  .map-panel.is-active iframe { pointer-events: auto; }
 }
 
 /* ---------- Tab 3: Table ---------- */
@@ -360,6 +348,7 @@ tbody tr.roster-row td{ padding:0; background:rgba(255,255,255,.015); }
 .modal{
   background:var(--bg-elevated); border:1px solid var(--border); border-radius:var(--radius);
   max-width:440px; width:100%; padding:24px; position:relative;
+  max-height: 85vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
 }
 .modal-close{
   position:absolute; top:12px; right:14px; background:none; border:none; color:var(--text-dim);
@@ -384,16 +373,22 @@ tbody tr.roster-row td{ padding:0; background:rgba(255,255,255,.015); }
 
 /* ---------- Mobile ---------- */
 @media (max-width:640px){
-  .topbar-inner{ padding:14px 14px 8px; flex-direction:column; align-items:flex-start; gap:4px; }
-  .brand h1{ font-size:19px; }
-  .brand-en{ font-size:10.5px; }
-  .games-dates{ font-size:12px; padding-bottom:0; }
+  .topbar-inner{ padding: 10px 14px 6px; gap: 2px; flex-direction:column; align-items:flex-start; }
+  .brand-mark { font-size: 10px; margin-bottom: 2px; }
+  .brand h1{ font-size: 16px; }
+  .brand-en{ display: none; }
+  .games-dates{ font-size: 11px; padding-bottom:0; }
   .tabs{ padding:0 10px; }
-  .tab-btn{ padding:10px 11px; font-size:11.5px; }
+  .tab-btn{ padding: 8px 10px; font-size: 12px; min-height: 44px; display: inline-flex; align-items: center; }
+  .topbar { padding-top: env(safe-area-inset-top); }
+  
+  main{ padding:14px 12px calc(50px + env(safe-area-inset-bottom)); }
+  
+  .search-wrap input { font-size: 16px; }
+  #mobile-table-sort { display: block !important; }
 
-  main{ padding:14px 12px 50px; }
   .panel-controls{ flex-direction:column; align-items:stretch; gap:10px; }
-  .hkg-chip{ justify-content:center; width:100%; }
+  .hkg-chip{ justify-content:center; width:100%; min-height: 44px; }
 
   .view-toggle{ gap:6px; }
   .view-btn{ flex:1; text-align:center; padding:10px 8px; font-size:12px; }
@@ -402,7 +397,7 @@ tbody tr.roster-row td{ padding:0; background:rgba(255,255,255,.015); }
   .day-chip .dnum{ font-size:14px; }
 
   .daily-header{ gap:10px; }
-  .day-nav{ width:34px; height:34px; font-size:17px; }
+  .day-nav{ width: 44px; height: 44px; font-size: 20px; }
   .daily-date{ font-size:15px; min-width:0; flex:1; }
   .daily-card{ padding:12px; flex-direction:column; gap:8px; }
   .daily-card .dc-badge{ align-self:flex-start; }
@@ -445,5 +440,16 @@ tbody tr.roster-row td{ padding:0; background:rgba(255,255,255,.015); }
   .sched-item{ font-size:12px; }
   .expand-tabs{ padding:12px 4px 0; }
 
-  .modal{ padding:20px; }
+  .modal-backdrop { align-items: flex-end; padding: 0; }
+  .modal { 
+    max-width: 100%; 
+    border-bottom-left-radius: 0; 
+    border-bottom-right-radius: 0; 
+    border-left: none; 
+    border-right: none; 
+    border-bottom: none; 
+    padding: 20px 18px calc(20px + env(safe-area-inset-bottom)); 
+    animation: slideUp 0.22s ease-out; 
+  }
 }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }

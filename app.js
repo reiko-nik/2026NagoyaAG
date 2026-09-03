@@ -97,7 +97,7 @@ function jumpToRoster(sport, event){
 // ==================================================================
 // TAB 1 — Day ribbon + Gantt timeline + Daily view
 // ==================================================================
-let calView = "timeline";
+let calView = window.innerWidth <= 640 ? "daily" : "timeline";
 let selectedDayIdx = clampTodayIdx();
 
 function clampTodayIdx(){
@@ -170,7 +170,13 @@ function renderDayRibbon(){
   markSelectedDayChip();
 }
 function markSelectedDayChip(){
-  $$(".day-chip").forEach(c=> c.classList.toggle("selected", Number(c.dataset.idx)===selectedDayIdx));
+  $$(".day-chip").forEach(c=> {
+    const isSel = Number(c.dataset.idx)===selectedDayIdx;
+    c.classList.toggle("selected", isSel);
+    if (isSel && window.innerWidth <= 640) {
+      c.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    }
+  });
 }
 
 function scrollGanttToDay(i){
@@ -262,11 +268,6 @@ function renderGantt(){
   setupGanttAxisPin(axisRow);
 }
 
-// The real axis row (axisRow) stays in normal document flow inside the horizontally-scrolling
-// .gantt-wrap. This clone is toggled to position:fixed only while that row would otherwise have
-// scrolled above the topbar but the gantt itself is still in view, so the date reference stays
-// visible without permanently occupying screen space. Its horizontal offset is kept in sync with
-// .gantt-wrap's own scrollLeft so it never drifts out of alignment with the bars underneath.
 let ganttAxisShadow = null;
 let syncGanttAxisPin = null;
 function setupGanttAxisPin(axisRow){
@@ -295,9 +296,6 @@ function setupGanttAxisPin(axisRow){
       ganttAxisShadow.style.display = "none";
     }
   }
-  // rAF-throttled: raw scroll events can fire far more often than the screen refreshes,
-  // especially during touch-driven momentum scrolling on mobile — syncing on every single one
-  // is what made the pin feel like it was lagging/stuttering behind the actual scroll position.
   let queued = false;
   function sync(){
     if(queued) return;
@@ -307,7 +305,7 @@ function setupGanttAxisPin(axisRow){
   wrap.addEventListener("scroll", sync, {passive:true});
   window.addEventListener("scroll", sync, {passive:true});
   window.addEventListener("resize", sync);
-  if(window.visualViewport) window.visualViewport.addEventListener("resize", sync); // iOS/Android dynamic toolbar
+  if(window.visualViewport) window.visualViewport.addEventListener("resize", sync);
   syncGanttAxisPin = sync;
   apply();
 }
@@ -345,7 +343,7 @@ function renderDailyView(){
     if(e.sessions && e.sessions.length){
       e.sessions.filter(s=>s.date===dateStr).forEach(s=>{
         const relevant = sessionIsHkgRelevant(e, s);
-        if(hkgOnly && hasOppTracking(e) && !relevant) return; // skip other countries' matches when filtering to HKG-only
+        if(hkgOnly && hasOppTracking(e) && !relevant) return;
         if(q){
           const hay = (e.sport+e.event+e.venue+s.name+(s.venue||"")).toLowerCase();
           if(!hay.includes(q)) return;
@@ -471,8 +469,8 @@ $("#map-hkg-only").addEventListener("change", applyMapFilters);
 // TAB 3 — Sortable table
 // ==================================================================
 let tableSort = { key:"start", dir:1 };
-const openRosterIds = new Set(); // remembers which rows are expanded across re-renders
-const subTabState = new Map();   // event id -> "schedule" | "roster" (which sub-tab is showing)
+const openRosterIds = new Set();
+const subTabState = new Map();
 
 function renderRosterPanel(roster){
   const men = roster.athletes.filter(a=>a.g==="M");
@@ -490,21 +488,15 @@ function renderRosterPanel(roster){
   </div>`;
 }
 
-// ---- match a session to the specific HKG athlete(s) competing in it -----------------------
-// Team sports (handball/baseball/softball/cricket/water polo) already flag their own HKG matches
-// via `s.opp`; for those we show the roster split by the gender implied in the session name.
-// Individual sports use each athlete's confirmed `event` tag (Chinese) matched against the
-// session's English name via discipline-specific keyword rules below.
 function matchSessionAthletes(e, s){
   const roster = getRoster(e.disciplineKey);
   if(!roster) return [];
   const name = s.name, n = name.toLowerCase();
-  const isWomenName = /\bwomen|\bgirl/i.test(name);
-  const isMenName = /\bmen\b|\bboy/i.test(name) && !isWomenName;
-  // word-boundary aware gender test — plain .includes('men') would wrongly match inside "women"
-  const hasGender = (str, isF) => new RegExp(`\\b${isF?'women':'men'}\\b`, 'i').test(str);
+  const isWomenName = /women|girl/i.test(name);
+  const isMenName = /men|boy/i.test(name) && !isWomenName;
+  const hasGender = (str, isF) => new RegExp(`\b${isF?'women':'men'}\b`, 'i').test(str);
 
-  if(s.opp){ // team match — whole roster of the implied gender
+  if(s.opp){
     return roster.athletes.filter(a => isWomenName ? a.g==='F' : isMenName ? a.g==='M' : true);
   }
 
@@ -518,7 +510,7 @@ function matchSessionAthletes(e, s){
         const wm = {'花劍':'foil','重劍':'épée','佩劍':'sabre'};
         const weapon = Object.keys(wm).find(zh=>ev.includes(zh));
         if(!weapon || !n.includes(wm[weapon]) || !hasGender(name, isF)) return false;
-        if(ev.includes('團體賽') && !ev.includes('個人') && !/\bteam\b/i.test(name)) return false;
+        if(ev.includes('團體賽') && !ev.includes('個人') && !/team/i.test(name)) return false;
         return true;
       }
       case 'archery': {
@@ -526,7 +518,7 @@ function matchSessionAthletes(e, s){
         if(!bow) return false;
         const code = bow + (isF ? 'W' : 'M');
         const spelled = (bow==='R'?'Recurve':'Compound') + ' ' + (isF?'Women':'Men');
-        return new RegExp(`\\b${code}\\b`).test(name) || name.includes(spelled);
+        return new RegExp(`\b${code}\b`).test(name) || name.includes(spelled);
       }
       case 'judo': case 'taekwondo': {
         const m = ev.match(/(\d+)公斤級/);
@@ -549,7 +541,7 @@ function matchSessionAthletes(e, s){
       case 'tennis': {
         if(ev.includes('單打') && !/singles/i.test(name)) return false;
         if(ev.includes('雙打') && !/doubles/i.test(name)) return false;
-        if(ev.includes('團體') && !/\bteam\b/i.test(name)) return false;
+        if(ev.includes('團體') && !/team/i.test(name)) return false;
         if(!/mixed/i.test(name) && !hasGender(name, isF)) return false;
         return true;
       }
@@ -570,7 +562,7 @@ function matchSessionAthletes(e, s){
         if(!stroke || !hasGender(name, isF)) return false;
         const distances = [...ev.matchAll(/(\d+)米/g)].map(m=>m[1]);
         if(!distances.length) return true;
-        return distances.some(d => new RegExp(`\\b${d}m\\b`).test(n));
+        return distances.some(d => new RegExp(`\b${d}m\b`).test(n));
       }
       case 'badminton':
         return ev.includes('混合雙打') && /mixed doubles/i.test(name);
@@ -720,13 +712,11 @@ function renderTable(){
     });
   });
 
-  // rows that were already open before this re-render need their sub-tab buttons re-wired
   $$("#table-body tr.roster-row:not([hidden])").forEach(rr=>{
     const id = Number(rr.dataset.for);
     const e = EVENTS.find(x=>x.id===id);
     if(e) wireExpandRow(rr, e);
   });
-
 }
 
 $$("th[data-sort]").forEach(th=>{
@@ -740,8 +730,6 @@ $$("th[data-sort]").forEach(th=>{
 $("#table-search").addEventListener("input", renderTable);
 $("#table-hkg-only").addEventListener("change", renderTable);
 
-// ---------- sticky offset (topbar height varies by breakpoint, so measure it instead of
-// hardcoding — used by .daily-header to pin itself just below the topbar) ----------
 function updateStickyOffsets(){
   const topbar = $(".topbar");
   const topbarH = topbar ? topbar.getBoundingClientRect().height : 0;
@@ -751,6 +739,28 @@ window.addEventListener("resize", updateStickyOffsets);
 if(window.visualViewport) window.visualViewport.addEventListener("resize", updateStickyOffsets);
 
 // ---------- init ----------
+if (calView === "daily") {
+  $$(".view-btn").forEach(b => b.classList.toggle("active", b.dataset.view === "daily"));
+  $("#timeline-view").classList.remove("active");
+  $("#daily-view").classList.add("active");
+  $("#day-ribbon").classList.remove("is-hidden");
+}
+
+const mobSort = $("#mobile-table-sort");
+if(mobSort){
+  mobSort.addEventListener("change", (e)=>{
+    tableSort.key = e.target.value;
+    tableSort.dir = 1;
+    renderTable();
+  });
+}
+
+const mapPanel = $(".map-panel");
+if(mapPanel){
+  mapPanel.addEventListener("click", ()=>mapPanel.classList.add("is-active"));
+  mapPanel.addEventListener("mouseleave", ()=>mapPanel.classList.remove("is-active"));
+}
+
 renderDayRibbon();
 $("#day-ribbon").classList.toggle("is-hidden", calView!=="daily");
 renderGantt();

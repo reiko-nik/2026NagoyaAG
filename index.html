@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>2026 名古屋亞運會 · 賽程追蹤</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -95,6 +95,15 @@
         <span class="hkg-chip">只顯示香港代表隊項目</span>
       </label>
     </div>
+    
+    <select id="mobile-table-sort" style="display:none; width:100%; margin-bottom: 10px; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 14px;">
+      <option value="start">Sort by: 日期 (Date)</option>
+      <option value="sport">Sort by: 運動項目 (Sport)</option>
+      <option value="event">Sort by: 分項 (Event)</option>
+      <option value="venue">Sort by: 場館 (Venue)</option>
+      <option value="hkg">Sort by: 香港代表隊 (HKG)</option>
+    </select>
+    
     <div class="table-wrap">
       <table id="events-table">
         <thead>
