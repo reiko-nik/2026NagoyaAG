@@ -97,13 +97,15 @@ main{ padding:20px 24px 60px; max-width:1280px; margin:0 auto; }
 .hint{ color:var(--text-dim); font-size:12.5px; margin-top:14px; line-height:1.6; }
 
 /* ---------- Day ribbon (signature element) ---------- */
-/* Sticky: keeps the full row of dates reachable while scrolling the gantt or the daily-card list,
-   so any date can be jumped to directly rather than only stepping prev/next. */
+/* Sticky in Daily view: keeps the full row of dates reachable while scrolling the daily-card
+   list, so any date can be jumped to directly rather than only stepping prev/next. Hidden in
+   Timeline view, where the gantt's own in-track date axis takes over that role instead. */
 .day-ribbon{
   display:flex; gap:5px; overflow-x:auto; padding:8px 0 10px; margin-bottom:14px;
   position: sticky; top: var(--topbar-h, 0px); z-index: 14;
   background: var(--bg);
 }
+.day-ribbon.is-hidden{ display:none; }
 .day-chip{
   flex:0 0 auto; min-width:52px; text-align:center; padding:8px 6px;
   background:var(--bg-card); border:1px solid var(--border); border-radius:8px;
@@ -189,8 +191,16 @@ main{ padding:20px 24px 60px; max-width:1280px; margin:0 auto; }
    pixel-aligned with them (fixes the misalignment between the outer day-ribbon and the gantt on
    narrow/mobile screens, where the two used to scroll independently). */
 .gantt-row.gantt-axis{
-  position:sticky; top:0; z-index:5; background:var(--bg-elevated);
-  border-bottom:1px solid var(--border); min-height:30px;
+  border-bottom:1px solid var(--border); min-height:30px; background:var(--bg-elevated);
+}
+/* Vertical stickiness for the axis is handled in JS (see setupGanttAxisPin in app.js) via a
+   fixed-position clone, not pure CSS position:sticky — overflow-x:auto on .gantt-wrap forces
+   overflow-y to also become a scroll container, which breaks page-level sticky behavior for
+   descendants placed inside it. The clone's left/width/top are computed from .gantt-wrap's own
+   rect, and its date cells are translated in sync with .gantt-wrap's scrollLeft so it stays
+   pixel-aligned with the bars underneath even while "floating" above them. */
+.gantt-row.gantt-axis.pinned{
+  position:fixed; z-index:8; margin:0; overflow:hidden;
 }
 .gantt-axis-label{ position:sticky; left:0; z-index:6; background:var(--bg-elevated); }
 .gantt-axis-track{ flex:1; display:flex; }

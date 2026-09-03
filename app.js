@@ -113,7 +113,11 @@ $$(".view-btn").forEach(btn=>{
     $$(".view-btn").forEach(b=>b.classList.toggle("active", b===btn));
     $("#timeline-view").classList.toggle("active", calView==="timeline");
     $("#daily-view").classList.toggle("active", calView==="daily");
+    // day-ribbon is only needed in Daily view now — Timeline has its own sticky in-track date
+    // axis that scrolls in lockstep with the bars, so the outer ribbon would be redundant there.
+    $("#day-ribbon").classList.toggle("is-hidden", calView!=="daily");
     if(calView==="daily") renderDailyView();
+    if(syncGanttAxisPin) syncGanttAxisPin();
     markSelectedDayChip();
   });
 });
@@ -218,7 +222,8 @@ function renderGantt(){
   const { byKey, order } = groupForGantt();
   const gantt = $("#gantt");
   gantt.innerHTML = "";
-  gantt.appendChild(renderGanttAxis());
+  const axisRow = renderGanttAxis();
+  gantt.appendChild(axisRow);
   order.forEach(key=>{
     const g = byKey[key];
     const row = document.createElement("div");
@@ -254,6 +259,47 @@ function renderGantt(){
     gantt.appendChild(row);
   });
   applyGanttFilters();
+  setupGanttAxisPin(axisRow);
+}
+
+// The real axis row (axisRow) stays in normal document flow inside the horizontally-scrolling
+// .gantt-wrap. This clone is toggled to position:fixed only while that row would otherwise have
+// scrolled above the topbar but the gantt itself is still in view, so the date reference stays
+// visible without permanently occupying screen space. Its horizontal offset is kept in sync with
+// .gantt-wrap's own scrollLeft so it never drifts out of alignment with the bars underneath.
+let ganttAxisShadow = null;
+let syncGanttAxisPin = null;
+function setupGanttAxisPin(axisRow){
+  const wrap = $(".gantt-wrap");
+  const fresh = axisRow.cloneNode(true);
+  fresh.classList.add("pinned");
+  fresh.style.display = "none";
+  if(ganttAxisShadow) ganttAxisShadow.replaceWith(fresh);
+  else document.body.appendChild(fresh);
+  ganttAxisShadow = fresh;
+
+  function sync(){
+    if(calView !== "timeline"){ ganttAxisShadow.style.display = "none"; return; }
+    const topbarH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--topbar-h")) || 0;
+    const wrapRect = wrap.getBoundingClientRect();
+    const axisH = axisRow.getBoundingClientRect().height || 30;
+    const shouldPin = wrapRect.top < topbarH && wrapRect.bottom > topbarH + axisH;
+    if(shouldPin){
+      ganttAxisShadow.style.display = "flex";
+      ganttAxisShadow.style.top = topbarH + "px";
+      ganttAxisShadow.style.left = wrapRect.left + "px";
+      ganttAxisShadow.style.width = wrapRect.width + "px";
+      const track = $(".gantt-axis-track", ganttAxisShadow);
+      if(track) track.style.transform = `translateX(${-wrap.scrollLeft}px)`;
+    } else {
+      ganttAxisShadow.style.display = "none";
+    }
+  }
+  wrap.addEventListener("scroll", sync, {passive:true});
+  window.addEventListener("scroll", sync, {passive:true});
+  window.addEventListener("resize", sync);
+  syncGanttAxisPin = sync;
+  sync();
 }
 
 function applyGanttFilters(){
@@ -695,6 +741,7 @@ window.addEventListener("resize", updateStickyOffsets);
 
 // ---------- init ----------
 renderDayRibbon();
+$("#day-ribbon").classList.toggle("is-hidden", calView!=="daily");
 renderGantt();
 renderVenueList();
 renderTable();
