@@ -60,7 +60,7 @@ function openModal(e, venues){
     <div class="m-row"><span>場館</span><span>${venues ? venues.join('、') : e.venue}</span></div>
     <div class="m-row"><span>地址</span><span>${e.address||''}</span></div>
     <div class="m-actions">
-      <a class="m-link" href="${mapExternalUrl(e)}" target="_blank" rel="noopener">在 Google 地圖开启 ↗</a>
+      <a class="m-link" href="${mapExternalUrl(e)}" target="_blank" rel="noopener">在 Google 地圖開啟 ↗</a>
       ${hasRoster ? `<button type="button" class="m-link m-link-secondary" id="modal-roster-btn">查看香港代表名單 →</button>` : ""}
     </div>
   `;
@@ -499,9 +499,9 @@ function matchSessionAthletes(e, s){
   const roster = getRoster(e.disciplineKey);
   if(!roster) return [];
   const name = s.name, n = name.toLowerCase();
-  const isWomenName = / women| girl/i.test(name);
-  const isMenName = / men | boy/i.test(name) && !isWomenName;
-  const hasGender = (str, isF) => new RegExp(`${isF?'women':'men'}`, 'i').test(str);
+  const isWomenName = /\bwomen|\bgirl/i.test(name);
+  const isMenName = /\bmen\b|\bboy/i.test(name) && !isWomenName;
+  const hasGender = (str, isF) => new RegExp(`\\b${isF?'women':'men'}\\b`, 'i').test(str);
 
   if(s.opp){
     return roster.athletes.filter(a => isWomenName ? a.g==='F' : isMenName ? a.g==='M' : true);
@@ -517,7 +517,7 @@ function matchSessionAthletes(e, s){
         const wm = {'花劍':'foil','重劍':'épée','佩劍':'sabre'};
         const weapon = Object.keys(wm).find(zh=>ev.includes(zh));
         if(!weapon || !n.includes(wm[weapon]) || !hasGender(name, isF)) return false;
-        if(ev.includes('團體賽') && !ev.includes('個人') && !/ team /i.test(name)) return false;
+        if(ev.includes('團體賽') && !ev.includes('個人') && !/\bteam\b/i.test(name)) return false;
         return true;
       }
       case 'archery': {
@@ -525,7 +525,7 @@ function matchSessionAthletes(e, s){
         if(!bow) return false;
         const code = bow + (isF ? 'W' : 'M');
         const spelled = (bow==='R'?'Recurve':'Compound') + ' ' + (isF?'Women':'Men');
-        return new RegExp(`${code}`).test(name) || name.includes(spelled);
+        return new RegExp(`\\b${code}\\b`).test(name) || name.includes(spelled);
       }
       case 'judo': case 'taekwondo': {
         const m = ev.match(/(\d+)公斤級/);
@@ -548,7 +548,7 @@ function matchSessionAthletes(e, s){
       case 'tennis': {
         if(ev.includes('單打') && !/singles/i.test(name)) return false;
         if(ev.includes('雙打') && !/doubles/i.test(name)) return false;
-        if(ev.includes('團體') && !/ team /i.test(name)) return false;
+        if(ev.includes('團體') && !/\bteam\b/i.test(name)) return false;
         if(!/mixed/i.test(name) && !hasGender(name, isF)) return false;
         return true;
       }
@@ -569,7 +569,7 @@ function matchSessionAthletes(e, s){
         if(!stroke || !hasGender(name, isF)) return false;
         const distances = [...ev.matchAll(/(\d+)米/g)].map(m=>m[1]);
         if(!distances.length) return true;
-        return distances.some(d => new RegExp(`${d}m`).test(n));
+        return distances.some(d => new RegExp(`\\b${d}m\\b`).test(n));
       }
       case 'badminton':
         return ev.includes('混合雙打') && /mixed doubles/i.test(name);
