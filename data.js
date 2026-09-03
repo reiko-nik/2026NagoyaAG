@@ -924,15 +924,6 @@ function getRoster(disciplineKey) {
   return disciplineKey && ROSTER[disciplineKey] ? ROSTER[disciplineKey] : null;
 }
 
-// Sports confirmed in the HKG delegation list that still have NO schedule data —
-// not present in the official "Event Schedule By Sport" file either, so no venue/date is known.
-// (Padel and Windsurfing were here too until the schedule file confirmed their venues/dates —
-// both are now full rows in EVENTS above, under disciplineKey "padel" and "sailing_windsurfing".)
-const HKG_UNSCHEDULED = [
-  { sport:"馬拉松游泳", disciplineKey:null },
-  { sport:"橋牌", disciplineKey:null },
-  { sport:"國際象棋", disciplineKey:null },
-  { sport:"中國象棋", disciplineKey:null },
-  { sport:"龍舟", disciplineKey:null },
-  { sport:"滾軸運動 - 滾軸溜冰", disciplineKey:null },
-];
+// Confirmed: 馬拉松游泳, 橋牌, 國際象棋, 中國象棋, 龍舟, and 滾軸運動 - 滾軸溜冰 have no HKG
+// participation and are absent from the official "Event Schedule By Sport" file entirely (not
+// part of this edition's program), so they are not represented anywhere in this dataset.

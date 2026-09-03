@@ -145,8 +145,21 @@ function renderDayRibbon(){
     chip.addEventListener("click", ()=>{
       selectedDayIdx = i;
       markSelectedDayChip();
-      if(calView==="daily") renderDailyView();
-      else scrollGanttToDay(i);
+      if(calView==="daily"){
+        renderDailyView();
+        // ribbon is sticky and may be reached while scrolled deep into a long card list —
+        // snap back so the newly-picked date's cards are visible right below it. (Can't use the
+        // ribbon's own rect for this: once stuck, it always reports its clamped position, not
+        // where it'd naturally sit — so anchor on the non-sticky list element instead.)
+        const list = $("#daily-list");
+        const topbarH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--topbar-h")) || 0;
+        const ribbonH = ribbon.getBoundingClientRect().height;
+        const listDocTop = list.getBoundingClientRect().top + window.scrollY;
+        const targetY = Math.max(0, listDocTop - topbarH - ribbonH - 10);
+        if(window.scrollY > targetY) window.scrollTo({ top: targetY, behavior: "smooth" });
+      } else {
+        scrollGanttToDay(i);
+      }
     });
     ribbon.appendChild(chip);
   }
@@ -660,41 +673,6 @@ function renderTable(){
 
 }
 
-function renderUnscheduled(){
-  const section = $("#unscheduled-section");
-  if(!section) return;
-  if(!HKG_UNSCHEDULED.length){ section.innerHTML = ""; return; }
-
-  section.innerHTML = `
-    <p class="hint">香港代表隊亦已確認參與以下項目，惟賽程表暫未提供場館/日期資料。如有代表名單，可點擊展開：</p>
-    <div class="unscheduled-list">
-      ${HKG_UNSCHEDULED.map(u=>{
-        const roster = u.disciplineKey ? getRoster(u.disciplineKey) : null;
-        const expandable = !!(roster && roster.athletes.length);
-        const key = "u:"+u.sport;
-        const isOpen = expandable && openRosterIds.has(key);
-        return `<div class="unscheduled-item${expandable?' expandable':''}${isOpen?' open':''}" data-key="${key}">
-          <div class="unscheduled-head">${expandable?'<span class="expand-ind">'+(isOpen?'▾':'▸')+'</span>':''}<span class="unscheduled-name">${u.sport}</span></div>
-          ${expandable ? `<div class="unscheduled-roster"${isOpen?'':' hidden'}>${renderRosterPanel(roster)}</div>` : ""}
-        </div>`;
-      }).join("")}
-    </div>`;
-
-  $$(".unscheduled-item.expandable", section).forEach(item=>{
-    item.addEventListener("click", ()=>{
-      const key = item.dataset.key;
-      const panel = $(".unscheduled-roster", item);
-      if(!panel) return;
-      const willOpen = panel.hasAttribute("hidden");
-      if(willOpen){ panel.removeAttribute("hidden"); openRosterIds.add(key); }
-      else { panel.setAttribute("hidden",""); openRosterIds.delete(key); }
-      item.classList.toggle("open", willOpen);
-      const ind = $(".expand-ind", item);
-      if(ind) ind.textContent = willOpen ? "▾" : "▸";
-    });
-  });
-}
-
 $$("th[data-sort]").forEach(th=>{
   th.addEventListener("click", ()=>{
     const key = th.dataset.sort;
@@ -720,5 +698,4 @@ renderDayRibbon();
 renderGantt();
 renderVenueList();
 renderTable();
-renderUnscheduled();
 updateStickyOffsets();
