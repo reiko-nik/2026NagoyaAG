@@ -304,6 +304,7 @@ tbody tr.roster-row td{ padding:0; background:rgba(255,255,255,.015); }
 }
 .roster-col .ath-en{ color:var(--text); }
 .roster-col .ath-zh{ color:var(--text-dim); font-size:11.5px; }
+.roster-col .ath-event{ display:block; color:var(--gold); font-size:10.5px; margin-top:1px; }
 
 /* ---------- Tab 3: HKG-confirmed sports pending a schedule ---------- */
 .unscheduled-section{ margin-top:18px; }

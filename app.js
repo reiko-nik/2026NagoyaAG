@@ -384,7 +384,7 @@ const subTabState = new Map();   // event id -> "schedule" | "roster" (which sub
 function renderRosterPanel(roster){
   const men = roster.athletes.filter(a=>a.g==="M");
   const women = roster.athletes.filter(a=>a.g==="F");
-  const list = arr => arr.map(a=>`<li><span class="ath-en">${a.en}</span><span class="ath-zh">${a.zh}</span></li>`).join("");
+  const list = arr => arr.map(a=>`<li><span class="ath-en">${a.en}</span><span class="ath-zh">${a.zh}${a.event?` <span class="ath-event">${a.event}</span>`:''}</span></li>`).join("");
   const col = (title, arr) => arr.length
     ? `<div class="roster-col"><h4>${title}（${arr.length}）</h4><ul>${list(arr)}</ul></div>`
     : "";
