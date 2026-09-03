@@ -278,7 +278,7 @@ function setupGanttAxisPin(axisRow){
   else document.body.appendChild(fresh);
   ganttAxisShadow = fresh;
 
-  function sync(){
+  function apply(){
     if(calView !== "timeline"){ ganttAxisShadow.style.display = "none"; return; }
     const topbarH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--topbar-h")) || 0;
     const wrapRect = wrap.getBoundingClientRect();
@@ -295,11 +295,21 @@ function setupGanttAxisPin(axisRow){
       ganttAxisShadow.style.display = "none";
     }
   }
+  // rAF-throttled: raw scroll events can fire far more often than the screen refreshes,
+  // especially during touch-driven momentum scrolling on mobile — syncing on every single one
+  // is what made the pin feel like it was lagging/stuttering behind the actual scroll position.
+  let queued = false;
+  function sync(){
+    if(queued) return;
+    queued = true;
+    requestAnimationFrame(()=>{ queued = false; apply(); });
+  }
   wrap.addEventListener("scroll", sync, {passive:true});
   window.addEventListener("scroll", sync, {passive:true});
   window.addEventListener("resize", sync);
+  if(window.visualViewport) window.visualViewport.addEventListener("resize", sync); // iOS/Android dynamic toolbar
   syncGanttAxisPin = sync;
-  sync();
+  apply();
 }
 
 function applyGanttFilters(){
@@ -738,6 +748,7 @@ function updateStickyOffsets(){
   document.documentElement.style.setProperty("--topbar-h", topbarH + "px");
 }
 window.addEventListener("resize", updateStickyOffsets);
+if(window.visualViewport) window.visualViewport.addEventListener("resize", updateStickyOffsets);
 
 // ---------- init ----------
 renderDayRibbon();
