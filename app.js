@@ -571,6 +571,19 @@ function matchSessionAthletes(e, s){
         if(!distances.length) return true;
         return distances.some(d => new RegExp(`\\b${d}m\\b`).test(n));
       }
+      case 'athletics': {
+        if(/heptathlon|decathlon/i.test(name)) return false; // combined events use different athletes
+        if(!hasGender(name, isF)) return false;
+        if(ev.includes('馬拉松競走')) return /race walk/i.test(name);
+        if(ev.includes('馬拉松')) return /marathon/i.test(name) && !/race walk/i.test(name);
+        if(ev.includes('跳高')) return /high jump/i.test(name);
+        if(ev.includes('跳遠')) return /long jump/i.test(name);
+        const isHurdles = ev.includes('欄');
+        if(isHurdles !== /hurdles/i.test(name)) return false;
+        const distances = [...ev.matchAll(/(\d+)米/g)].map(m=>m[1]);
+        if(!distances.length) return false;
+        return distances.some(d => new RegExp(`\\b${d}m\\b`).test(n));
+      }
       case 'badminton':
         return ev.includes('混合雙打') && /mixed doubles/i.test(name);
       case 'volleyball_beach':
