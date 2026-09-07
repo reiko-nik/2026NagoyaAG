@@ -602,23 +602,54 @@ function matchSessionAthletes(e, s){
 }
 
 function renderSchedulePanel(e){
-  const hkgSessions = HKG_SCHEDULE[e.disciplineKey];
-  if(hkgSessions && hkgSessions.length) return renderHkgSchedulePanel(hkgSessions);
+  let hkgSessions = HKG_SCHEDULE[e.disciplineKey];
+  if(hkgSessions && hkgSessions.length){
+    // "場地單車" (Track) and "公路單車" (Road) are two separate EVENTS rows that share one
+    // disciplineKey (the roster/delegation entry covers both) — without this filter, either row
+    // would show the other discipline's sessions too (e.g. Track showing Road's Time Trial).
+    if(e.disciplineKey === "cycling_track_road"){
+      const isRoadRow = e.event.includes("公路");
+      const isRoadEvent = s => /road race|time trial/i.test(s.event);
+      hkgSessions = hkgSessions.filter(s => isRoadEvent(s) === isRoadRow);
+    }
+    return renderHkgSchedulePanel(hkgSessions);
+  }
   return renderGenericSchedulePanel(e);
 }
 
 // Primary path: HKG's own delegation-specific schedule (Traditional Chinese event names,
 // specific athlete entrants, sorted by date/time). Covers every sport HKG competes in.
 function renderHkgSchedulePanel(sessions){
-  const byDate = {};
-  const order = [];
+  // Group by gender first so men's and women's events form clearly separate sections instead of
+  // interleaving chronologically (most useful for disciplines, like cycling, where both compete
+  // across many overlapping days) — the gender header itself is only shown when 2+ groups exist,
+  // since most disciplines are single-gender and the label would just be noise there.
+  const GENDER_ORDER = { "男子":0, "女子":1, "混合":2, "其他":3 };
+  const genderGroups = {};
   sessions.forEach(s=>{
-    if(!byDate[s.date]){ byDate[s.date] = []; order.push(s.date); }
-    byDate[s.date].push(s);
+    const m = s.event.match(/^(男子|女子|混合|Mixed|Men|Women|Boy|Girl)/i);
+    let g = "其他";
+    if(m){
+      const w = m[1];
+      if(/^(男子|Men|Boy)/i.test(w)) g = "男子";
+      else if(/^(女子|Women|Girl)/i.test(w)) g = "女子";
+      else if(/^(混合|Mixed)/i.test(w)) g = "混合";
+    }
+    (genderGroups[g] = genderGroups[g] || []).push(s);
   });
+  const genderOrder = Object.keys(genderGroups).sort((a,b)=>GENDER_ORDER[a]-GENDER_ORDER[b]);
+  const showGenderLabels = genderOrder.length > 1;
+
   const fmtDate = ds=>{ const d = toDate(ds); return `${d.getMonth()+1}/${d.getDate()} (${WEEKDAY[d.getDay()]})`; };
-  return `<div class="schedule-panel">
-    ${order.map(ds=>`
+
+  const renderDayGroups = (sessionsForGroup) => {
+    const byDate = {};
+    const order = [];
+    sessionsForGroup.forEach(s=>{
+      if(!byDate[s.date]){ byDate[s.date] = []; order.push(s.date); }
+      byDate[s.date].push(s);
+    });
+    return order.map(ds=>`
       <div class="sched-day">
         <div class="sched-day-label">${fmtDate(ds)}</div>
         <div class="sched-day-items">
@@ -639,6 +670,14 @@ function renderHkgSchedulePanel(sessions){
               ${athleteLine}
             </div>`;}).join('')}
         </div>
+      </div>`).join('');
+  };
+
+  return `<div class="schedule-panel">
+    ${genderOrder.map(g=>`
+      <div class="sched-gender-group">
+        ${showGenderLabels ? `<div class="sched-gender-label">${g}</div>` : ''}
+        ${renderDayGroups(genderGroups[g])}
       </div>`).join('')}
   </div>`;
 }
