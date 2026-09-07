@@ -602,6 +602,50 @@ function matchSessionAthletes(e, s){
 }
 
 function renderSchedulePanel(e){
+  const hkgSessions = HKG_SCHEDULE[e.disciplineKey];
+  if(hkgSessions && hkgSessions.length) return renderHkgSchedulePanel(hkgSessions);
+  return renderGenericSchedulePanel(e);
+}
+
+// Primary path: HKG's own delegation-specific schedule (Traditional Chinese event names,
+// specific athlete entrants, sorted by date/time). Covers every sport HKG competes in.
+function renderHkgSchedulePanel(sessions){
+  const byDate = {};
+  const order = [];
+  sessions.forEach(s=>{
+    if(!byDate[s.date]){ byDate[s.date] = []; order.push(s.date); }
+    byDate[s.date].push(s);
+  });
+  const fmtDate = ds=>{ const d = toDate(ds); return `${d.getMonth()+1}/${d.getDate()} (${WEEKDAY[d.getDay()]})`; };
+  return `<div class="schedule-panel">
+    ${order.map(ds=>`
+      <div class="sched-day">
+        <div class="sched-day-label">${fmtDate(ds)}</div>
+        <div class="sched-day-items">
+          ${byDate[ds].map(s=>{
+            const hasAthletes = s.athletes && s.athletes.length>0;
+            const athleteLine = hasAthletes
+              ? `<div class="sched-athletes">🇭🇰 ${s.athletes.map(a=>a.zh?`${a.zh} (${a.en})`:a.en).join('、')}</div>`
+              : '';
+            const statusBadge = s.confirmed
+              ? `<span class="sched-status status-confirmed">已確認</span>`
+              : `<span class="sched-status status-candidate">候選名單</span>`;
+            return `
+            <div class="sched-item${s.confirmed?' hkg-match':' hkg-tentative'}">
+              <span class="sched-time">${s.start||''}${s.end?'–'+s.end:''}</span>
+              <span class="sched-name">${s.event}</span>
+              ${statusBadge}
+              ${s.venue?`<span class="sched-venue">📍 ${s.venue}</span>`:''}
+              ${athleteLine}
+            </div>`;}).join('')}
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+
+// Fallback: sports HKG doesn't compete in (or without dedicated coverage-file data) still show
+// the general English-language schedule from the official master schedule file.
+function renderGenericSchedulePanel(e){
   const sessions = e.sessions;
   const byDate = {};
   const order = [];

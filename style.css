@@ -295,6 +295,13 @@ tbody tr:last-child td{ border-bottom:none; }
   padding:7px 10px; font-size:12.5px;
 }
 .sched-item.hkg-match{ border-color:var(--hkg-red); background:rgba(208,24,47,.08); }
+.sched-item.hkg-tentative{ border-color:rgba(242,177,52,.4); border-style:dashed; }
+.sched-status{
+  flex:0 0 auto; font-size:10px; font-weight:600; padding:2px 8px; border-radius:10px;
+  text-transform:uppercase; letter-spacing:.03em;
+}
+.sched-status.status-confirmed{ background:rgba(208,24,47,.2); color:#ff8fa0; }
+.sched-status.status-candidate{ background:rgba(242,177,52,.15); color:var(--gold); }
 .sched-time{ color:var(--text-dim); font-variant-numeric:tabular-nums; flex:0 0 auto; }
 .sched-name{ flex:1 1 160px; }
 .sched-opp{ color:#ff8fa0; font-weight:600; }
