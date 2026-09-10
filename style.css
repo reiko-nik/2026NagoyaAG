@@ -237,17 +237,33 @@ main{ padding:20px 24px 60px; max-width:1280px; margin:0 auto; }
 }
 .tag.hkg{ background:rgba(208,24,47,.25); color:#ff8fa0; }
 .map-panel{ position:sticky; top:130px; }
-.map-panel iframe{ width:100%; height:500px; border:0; border-radius:var(--radius); border:1px solid var(--border); }
+#leaflet-map{ width:100%; height:500px; border-radius:var(--radius); border:1px solid var(--border); background:var(--bg-card); }
+.map-unavailable{
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  height:100%; padding:20px; color:var(--text-dim); font-size:13px; line-height:1.6;
+}
 .map-external{
   display:inline-block; margin-top:10px; color:var(--gold); text-decoration:none;
   font-size:13px; font-weight:500;
 }
 .map-external:hover{ text-decoration:underline; }
+/* venue pin markers */
+.venue-pin{ background:transparent; border:none; }
+.venue-pin-dot{
+  width:14px; height:14px; border-radius:50%; background:var(--flame);
+  border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.5);
+}
+.venue-pin-hkg .venue-pin-dot{ background:var(--hkg-red); width:16px; height:16px; }
+.map-popup{ font-family:"Noto Sans TC",sans-serif; }
+.map-popup strong{ display:block; margin-bottom:6px; font-size:13px; }
+.popup-sports{ display:flex; flex-wrap:wrap; gap:4px; max-width:220px; }
+.popup-tag{
+  font-size:10px; padding:2px 7px; border-radius:10px; background:#eee; color:#555;
+}
+.popup-tag.hkg{ background:rgba(208,24,47,.15); color:var(--hkg-red); font-weight:600; }
 @media (max-width:860px){
   .map-layout{ grid-template-columns:1fr; }
   .map-panel{ position:static; }
-  .map-panel iframe { pointer-events: none; }
-  .map-panel.is-active iframe { pointer-events: auto; }
 }
 
 /* ---------- Tab 3: Table ---------- */
@@ -436,7 +452,7 @@ tbody tr.roster-row td{ padding:0; background:rgba(255,255,255,.015); }
   .gantt-axis-cell .gac-wd{ font-size:7.5px; }
 
   .map-panel{ position:static; }
-  .map-panel iframe{ height:280px; }
+  #leaflet-map{ height:320px; }
   .venue-list{ max-height:280px; }
 
   /* Table -> stacked cards */

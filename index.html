@@ -6,6 +6,8 @@
 <title>2026 名古屋亞運會 · 賽程追蹤</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -77,8 +79,7 @@
     <div class="map-layout">
       <div class="venue-list" id="venue-list"></div>
       <div class="map-panel">
-        <iframe id="map-frame" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
-          src="https://www.google.com/maps?q=%E5%90%8D%E5%8F%A4%E5%B1%8B%E5%B8%82%E7%91%9E%E7%A9%82%E5%85%AC%E5%9C%92%E9%99%B8%E4%B8%8A%E7%AB%B6%E6%8A%80%E5%A0%B4&output=embed"></iframe>
+        <div id="leaflet-map"></div>
         <a id="map-external-link" class="map-external" href="#" target="_blank" rel="noopener">在 Google 地圖開啟 ↗</a>
       </div>
     </div>

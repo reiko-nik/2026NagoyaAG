@@ -8,7 +8,6 @@ const WEEKDAY = ["日","一","二","三","四","五","六"];
 // shift the date by a day in timezones ahead of UTC (e.g. Hong Kong, Japan).
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 
-function mapEmbedUrl(query){ return `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`; }
 function mapExternalUrl(e){ return e.mapLinkOverride || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.mapQuery)}`; }
 
 const GAMES_START = toDate(EVENTS.reduce((m,e)=> e.start<m?e.start:m, EVENTS[0].start));
@@ -414,22 +413,85 @@ $("#day-next").addEventListener("click", ()=>{
 });
 
 // ==================================================================
-// TAB 2 — Venue list + embedded Google Map
+// TAB 2 — Venue list + multi-pin interactive map (Leaflet + OpenStreetMap)
 // ==================================================================
+// Derived from the most granular venue data available per row (HKG_SCHEDULE's own per-session
+// venue where present, else the general per-session data, else the row's own static venue as a
+// last resort for rows with no session breakdown, like the ceremonies) — NOT the row-level
+// e.venue field, which for football/baseball/handball/indoor-volleyball is a single joined string
+// covering every venue that sport ever uses, and would otherwise collapse into one card/pin.
 function groupByVenue(){
   const byVenue = {};
   const order = [];
+  function addSport(venueName, sport, event, hkg){
+    if(!venueName) return;
+    if(!byVenue[venueName]){ byVenue[venueName] = { venue:venueName, sports:new Map(), hkg:false }; order.push(venueName); }
+    const v = byVenue[venueName];
+    const key = sport+"|"+event;
+    if(!v.sports.has(key)) v.sports.set(key, {sport, event, hkg});
+    else if(hkg) v.sports.get(key).hkg = true;
+    if(hkg) v.hkg = true;
+  }
   EVENTS.forEach(e=>{
-    const key = e.venue+"|"+e.address;
-    if(!byVenue[key]){ byVenue[key] = { venue:e.venue, address:e.address, city:e.city, mapQuery:e.mapQuery, mapLinkOverride:e.mapLinkOverride, sports:[], hkg:false }; order.push(key); }
-    const v = byVenue[key];
-    v.sports.push({sport:e.sport, event:e.event, hkg:e.hkg, start:e.start, end:e.end});
-    if(e.hkg) v.hkg = true;
+    const hkgSessions = HKG_SCHEDULE[e.disciplineKey];
+    if(hkgSessions && hkgSessions.length){
+      hkgSessions.forEach(s=> addSport(s.venue, e.sport, e.event, e.hkg));
+    } else if(e.sessions && e.sessions.length){
+      e.sessions.forEach(s=> addSport(s.venue, e.sport, e.event, e.hkg));
+    } else {
+      addSport(e.venue, e.sport, e.event, e.hkg);
+    }
   });
-  return order.map(k=>byVenue[k]);
+  return order.map(name=>{
+    const v = byVenue[name];
+    return { venue:name, sports:[...v.sports.values()], hkg:v.hkg, coords: VENUE_COORDS[name] || null };
+  });
 }
 
 let currentVenues = [];
+let leafletMap = null;
+let leafletMarkers = {};
+
+function initLeafletMap(){
+  if(leafletMap || typeof L === "undefined") return;
+  leafletMap = L.map("leaflet-map", { scrollWheelZoom:true }).setView([35.15, 137.0], 9);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  }).addTo(leafletMap);
+}
+
+function renderMapPins(venues){
+  // Leaflet is loaded from a CDN — if that's blocked (offline, firewall, ad-blocker), degrade to
+  // just the venue list working normally instead of taking down the rest of the app's init.
+  if(typeof L === "undefined"){
+    const panel = $("#leaflet-map");
+    if(panel && !panel.dataset.fallbackShown){
+      panel.dataset.fallbackShown = "1";
+      panel.innerHTML = '<div class="map-unavailable">地圖組件無法載入，請改用下方名單，或點擊「在 Google 地圖開啟」查看個別場館。</div>';
+    }
+    return;
+  }
+  initLeafletMap();
+  Object.values(leafletMarkers).forEach(m=> leafletMap.removeLayer(m));
+  leafletMarkers = {};
+  const bounds = [];
+  venues.forEach(v=>{
+    if(!v.coords) return;
+    const icon = L.divIcon({
+      className: "venue-pin" + (v.hkg ? " venue-pin-hkg" : ""),
+      html: '<div class="venue-pin-dot"></div>', iconSize:[16,16], iconAnchor:[8,8],
+    });
+    const marker = L.marker(v.coords, {icon}).addTo(leafletMap);
+    const sportsHtml = v.sports.map(s=>`<span class="popup-tag${s.hkg?' hkg':''}">${s.sport}</span>`).join("");
+    marker.bindPopup(`<div class="map-popup"><strong>${v.venue}</strong><div class="popup-sports">${sportsHtml}</div></div>`);
+    marker.on("click", ()=> selectVenueByName(v.venue));
+    leafletMarkers[v.venue] = marker;
+    bounds.push(v.coords);
+  });
+  if(bounds.length) leafletMap.fitBounds(bounds, { padding:[30,30] });
+}
+
 function renderVenueList(){
   currentVenues = groupByVenue();
   const list = $("#venue-list");
@@ -442,32 +504,47 @@ function renderVenueList(){
     card.dataset.search = (v.venue+" "+v.sports.map(s=>s.sport+" "+s.event).join(" ")).toLowerCase();
     card.innerHTML = `
       <div class="vname">${v.venue}</div>
-      <div class="vmeta">${v.city} · ${v.address}</div>
       <div class="vsports">${v.sports.map(s=>`<span class="tag${s.hkg?' hkg':''}">${s.sport}</span>`).join("")}</div>
     `;
     card.addEventListener("click", ()=> selectVenue(idx));
     list.appendChild(card);
   });
-  if(currentVenues.length) selectVenue(0);
+  renderMapPins(currentVenues);
   applyMapFilters();
 }
 
 function selectVenue(idx){
+  const v = currentVenues[idx];
+  if(!v) return;
   $$(".venue-card").forEach(c=>c.classList.remove("selected"));
   const card = $(`.venue-card[data-idx="${idx}"]`);
   if(card) card.classList.add("selected");
-  const v = currentVenues[idx];
-  $("#map-frame").src = mapEmbedUrl(v.mapQuery);
-  $("#map-external-link").href = v.mapLinkOverride || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.mapQuery)}`;
+  if(v.coords && leafletMap){
+    leafletMap.setView(v.coords, 15, {animate:true});
+    const marker = leafletMarkers[v.venue];
+    if(marker) marker.openPopup();
+    $("#map-external-link").href = `https://www.google.com/maps/search/?api=1&query=${v.coords[0]},${v.coords[1]}`;
+  } else if(v.coords){
+    $("#map-external-link").href = `https://www.google.com/maps/search/?api=1&query=${v.coords[0]},${v.coords[1]}`;
+  } else {
+    $("#map-external-link").href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.venue)}`;
+  }
+}
+function selectVenueByName(name){
+  const idx = currentVenues.findIndex(v=>v.venue===name);
+  if(idx>=0) selectVenue(idx);
 }
 
 function applyMapFilters(){
   const q = $("#map-search").value.trim().toLowerCase();
   const hkgOnly = $("#map-hkg-only").checked;
-  $$(".venue-card").forEach(card=>{
-    const matches = (!q || card.dataset.search.includes(q)) && (!hkgOnly || card.dataset.hkg==="true");
-    card.style.display = matches ? "" : "none";
+  const matchesFilter = card => (!q || card.dataset.search.includes(q)) && (!hkgOnly || card.dataset.hkg==="true");
+  $$(".venue-card").forEach(card=>{ card.style.display = matchesFilter(card) ? "" : "none"; });
+  const filteredVenues = currentVenues.filter((v,idx)=>{
+    const card = $(`.venue-card[data-idx="${idx}"]`);
+    return card && matchesFilter(card);
   });
+  renderMapPins(filteredVenues);
 }
 $("#map-search").addEventListener("input", applyMapFilters);
 $("#map-hkg-only").addEventListener("change", applyMapFilters);
@@ -868,11 +945,8 @@ if(mobSort){
   });
 }
 
-const mapPanel = $(".map-panel");
-if(mapPanel){
-  mapPanel.addEventListener("click", ()=>mapPanel.classList.add("is-active"));
-  mapPanel.addEventListener("mouseleave", ()=>mapPanel.classList.remove("is-active"));
-}
+// Leaflet's own touch/gesture handling covers panning and zoom natively, so (unlike the old
+// iframe embed) no tap-to-activate dance is needed to stop it from trapping page scroll.
 
 renderDayRibbon();
 $("#day-ribbon").classList.toggle("is-hidden", calView!=="daily");
