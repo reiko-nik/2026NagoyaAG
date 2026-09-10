@@ -269,6 +269,10 @@ tbody tr:last-child td{ border-bottom:none; }
 }
 .badge-none{ color:var(--text-dim); font-size:12px; }
 .date-range{ color:var(--text-dim); font-variant-numeric:tabular-nums; }
+.venue-multi{
+  display:inline-block; font-size:12px; color:var(--text-dim); cursor:help;
+  border-bottom:1px dotted var(--text-dim);
+}
 
 /* ---------- Tab 3: expand tabs (schedule / roster) ---------- */
 .expand-tabs{ display:flex; gap:6px; padding:14px 16px 0 16px; }

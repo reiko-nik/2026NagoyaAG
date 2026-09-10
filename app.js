@@ -745,6 +745,16 @@ function wireExpandRow(rr, e){
   });
 }
 
+// Some rows (football, baseball, handball, indoor volleyball) span several venues across their
+// many sessions — showing every venue joined together in the table's summary column is unhelpful
+// noise, and the specific venue for any one match is already shown correctly when the row is
+// expanded (schedule panel) or in Tab 1. Collapse the summary to a count + tooltip instead.
+function formatVenueCell(venue){
+  if(!venue || !venue.includes("、")) return venue || "";
+  const list = venue.split("、");
+  return `<span class="venue-multi" title="${list.join('、')}">多個場館 (${list.length})</span>`;
+}
+
 function renderTable(){
   let rows = [...EVENTS];
   const q = $("#table-search").value.trim().toLowerCase();
@@ -776,7 +786,7 @@ function renderTable(){
       <td class="date-range" data-label="日期">${dateStr}</td>
       <td data-label="運動項目"><strong>${expandable?'<span class="expand-ind">'+(isOpen?'▾':'▸')+'</span>':''}${e.sport}</strong></td>
       <td data-label="分項">${e.event}</td>
-      <td data-label="場館">${e.venue}</td>
+      <td data-label="場館">${formatVenueCell(e.venue)}</td>
       <td data-label="香港代表隊">${e.hkg ? '<span class="badge-hkg">🇭🇰 HKG</span>' : '<span class="badge-none">—</span>'}</td>
     </tr>`;
     const rosterRow = expandable
