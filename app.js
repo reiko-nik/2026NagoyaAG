@@ -333,6 +333,65 @@ $("#cal-search").addEventListener("input", onCalFiltersChanged);
 $("#cal-hkg-only").addEventListener("change", onCalFiltersChanged);
 
 // ---- Daily events view ----
+// Mirrors Tab 3's own precedence: HKG_SCHEDULE (Traditional Chinese, athlete-specific, confirmed/
+// candidate status) is the primary source for any discipline it covers; everything else falls
+// back to the general per-session data with athletes resolved via matchSessionAthletes(), exactly
+// as Tab 3's schedule panel does — so the two tabs never disagree about the same match.
+function collectDailyCards(dateStr, q, hkgOnly){
+  const cards = [];
+  EVENTS.forEach(e=>{
+    if(hkgOnly && !e.hkg) return;
+    const hkgSessions = HKG_SCHEDULE[e.disciplineKey];
+    if(hkgSessions && hkgSessions.length){
+      hkgSessions.filter(s=>s.date===dateStr).forEach(s=>{
+        if(q){
+          const hay = (e.sport+e.event+(s.venue||"")+s.event+s.athletes.map(a=>a.zh+a.en).join(" ")).toLowerCase();
+          if(!hay.includes(q)) return;
+        }
+        cards.push({
+          e, key:`${e.id}|hkg|${s.date}|${s.start}|${s.event}`,
+          start:s.start, end:s.end, name:s.event, venue:s.venue,
+          statusType: s.confirmed ? "confirmed" : "candidate",
+          statusLabel: s.confirmed ? "已確認" : "候選名單",
+          athletes: s.athletes.map(a=>({zh:a.zh, en:a.en})),
+          hkgRelevant: true, hkgMatch: s.confirmed,
+        });
+      });
+    } else if(e.sessions && e.sessions.length){
+      e.sessions.filter(s=>s.date===dateStr).forEach(s=>{
+        const relevant = sessionIsHkgRelevant(e, s);
+        if(hkgOnly && hasOppTracking(e) && !relevant) return;
+        if(q){
+          const hay = (e.sport+e.event+e.venue+s.name+(s.venue||"")).toLowerCase();
+          if(!hay.includes(q)) return;
+        }
+        const athletes = relevant ? matchSessionAthletes(e, s) : [];
+        cards.push({
+          e, key:`${e.id}|gen|${s.date}|${s.start}|${s.name}`,
+          start:s.start, end:s.end, name:s.name, venue:s.venue||e.venue,
+          statusType: "phase", statusLabel: PHASE_LABELS[s.phase]||s.phase, phaseCode:s.phase,
+          athletes: athletes.map(a=>({zh:a.zh, en:a.en})),
+          hkgRelevant: relevant, hkgMatch: !!s.opp, opp: s.opp,
+        });
+      });
+    } else if(inAnyRange(dateStr, e.dateRanges)){
+      if(q){
+        const hay = (e.sport+e.event+e.venue).toLowerCase();
+        if(!hay.includes(q)) return;
+      }
+      cards.push({
+        e, key:`${e.id}|allday|${dateStr}`,
+        start:null, end:null, name:e.event, venue:e.venue,
+        statusType:null, statusLabel:"", athletes:[], hkgRelevant:e.hkg, hkgMatch:false,
+      });
+    }
+  });
+  cards.sort((a,b)=> (Number(b.hkgRelevant)-Number(a.hkgRelevant)) || (a.start||"").localeCompare(b.start||"") || a.e.sport.localeCompare(b.e.sport,'zh-Hant'));
+  return cards;
+}
+
+const openDailyCards = new Set();
+
 function renderDailyView(){
   const dateStr = dateStrForIdx(selectedDayIdx);
   const d = toDate(dateStr);
@@ -342,66 +401,56 @@ function renderDailyView(){
 
   const q = $("#cal-search").value.trim().toLowerCase();
   const hkgOnly = $("#cal-hkg-only").checked;
-
-  let cards = [];
-  EVENTS.forEach(e=>{
-    if(hkgOnly && !e.hkg) return;
-    if(e.sessions && e.sessions.length){
-      e.sessions.filter(s=>s.date===dateStr).forEach(s=>{
-        const relevant = sessionIsHkgRelevant(e, s);
-        if(hkgOnly && hasOppTracking(e) && !relevant) return;
-        if(q){
-          const hay = (e.sport+e.event+e.venue+s.name+(s.venue||"")).toLowerCase();
-          if(!hay.includes(q)) return;
-        }
-        cards.push({ e, s, hkgMatch: !!s.opp, relevant });
-      });
-    } else if(inAnyRange(dateStr, e.dateRanges)){
-      if(q){
-        const hay = (e.sport+e.event+e.venue).toLowerCase();
-        if(!hay.includes(q)) return;
-      }
-      cards.push({ e, s:null, hkgMatch:false, relevant: e.hkg });
-    }
-  });
-  cards.sort((a,b)=> (Number(b.relevant)-Number(a.relevant)) || ((a.s&&a.s.start)||"").localeCompare((b.s&&b.s.start)||"") || a.e.sport.localeCompare(b.e.sport,'zh-Hant'));
+  const cards = collectDailyCards(dateStr, q, hkgOnly);
 
   const list = $("#daily-list");
   if(!cards.length){
     list.innerHTML = `<div class="daily-empty">此日沒有符合篩選條件的賽事</div>`;
     return;
   }
-  list.innerHTML = cards.map(({e, s, hkgMatch, relevant})=>{
-    const sidx = s ? e.sessions.indexOf(s) : -1;
-    const timeStr = s ? (s.start||"") + (s.end?`–${s.end}`:"") : "全日";
-    const nameStr = s ? s.name : e.event;
-    const venueStr = s ? (s.venue||e.venue) : e.venue;
-    const phaseBadge = s ? `<span class="badge-phase phase-${s.phase}">${PHASE_LABELS[s.phase]||s.phase}</span>` : "";
-    const oppBadge = s && s.opp ? `<span class="badge-opp">vs ${s.opp}</span>` : "";
-    return `<div class="daily-card${relevant?' hkg':''}${hkgMatch?' hkg-match':''}" data-id="${e.id}" data-sidx="${sidx}">
-      <div class="dc-main">
+
+  list.innerHTML = cards.map(c=>{
+    const isOpen = openDailyCards.has(c.key);
+    const timeStr = c.start ? (c.start + (c.end?`–${c.end}`:"")) : "全日";
+    const oppBadge = c.opp ? `<span class="badge-opp">vs ${c.opp}</span>` : "";
+    const statusBadge = c.statusType==="phase"
+      ? `<span class="badge-phase phase-${c.phaseCode}">${c.statusLabel}</span>`
+      : c.statusType ? `<span class="sched-status status-${c.statusType}">${c.statusLabel}</span>` : "";
+    const mapHref = c.venue && VENUE_COORDS[c.venue]
+      ? `https://www.google.com/maps/search/?api=1&query=${VENUE_COORDS[c.venue][0]},${VENUE_COORDS[c.venue][1]}`
+      : mapExternalUrl(c.e);
+    const detail = `
+      <div class="dc-detail"${isOpen?'':' hidden'}>
+        <div class="dc-venue-row">${c.venue?`📍 ${c.venue}`:''} <a href="${mapHref}" target="_blank" rel="noopener" class="dc-maplink">在 Google 地圖開啟 ↗</a></div>
+        ${c.athletes.length ? `<div class="dc-athletes">🇭🇰 ${c.athletes.map(a=>a.zh?`${a.zh} (${a.en})`:a.en).join('、')}</div>` : ''}
+      </div>`;
+    return `<div class="daily-card${c.hkgRelevant?' hkg':''}${c.hkgMatch?' hkg-match':''}${isOpen?' open':''}" data-key="${c.key}">
+      <div class="dc-header">
         <div class="dc-time">${timeStr}</div>
-        <div class="dc-sport">${e.sport}</div>
-        <div class="dc-event">${nameStr}</div>
-        <div class="dc-venue">📍 ${venueStr}</div>
+        <div class="dc-main-text">
+          <div class="dc-sport">${c.e.sport}</div>
+          <div class="dc-event">${c.name}</div>
+        </div>
+        <div class="dc-badges">
+          ${statusBadge}${oppBadge}
+          ${c.hkgRelevant ? '<span class="badge-hkg">🇭🇰 HKG</span>' : ''}
+          <span class="dc-expand-ind">${isOpen?'▾':'▸'}</span>
+        </div>
       </div>
-      <div class="dc-badge">${phaseBadge}${oppBadge}${relevant ? '<span class="badge-hkg">🇭🇰 HKG</span>' : ''}</div>
+      ${detail}
     </div>`;
   }).join("");
 
   $$(".daily-card").forEach(card=>{
     card.addEventListener("click", ()=>{
-      const e = EVENTS.find(x=>x.id===Number(card.dataset.id));
-      if(!e) return;
-      const sidx = Number(card.dataset.sidx);
-      const s = sidx>=0 ? e.sessions[sidx] : null;
-      if(s){
-        openModal({ sport:e.sport, event:e.event, title:s.name, start:s.date, end:s.date, hkg:sessionIsHkgRelevant(e,s), venue:s.venue||e.venue,
-                    address:e.address, mapQuery:e.mapQuery, mapLinkOverride:e.mapLinkOverride, disciplineKey:e.disciplineKey,
-                    sessionTime:(s.start||"")+(s.end?`–${s.end}`:""), phase:s.phase, opp:s.opp });
-      } else {
-        openModal(e);
-      }
+      const key = card.dataset.key;
+      const detailEl = $(".dc-detail", card);
+      const willOpen = detailEl.hasAttribute("hidden");
+      if(willOpen){ detailEl.removeAttribute("hidden"); openDailyCards.add(key); }
+      else { detailEl.setAttribute("hidden",""); openDailyCards.delete(key); }
+      card.classList.toggle("open", willOpen);
+      const ind = $(".dc-expand-ind", card);
+      if(ind) ind.textContent = willOpen ? "▾" : "▸";
     });
   });
 }
